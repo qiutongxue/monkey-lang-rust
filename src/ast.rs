@@ -1,20 +1,32 @@
-use crate::token::Token;
+use crate::{impl_as_any, token::Token, AsAny};
 
-pub(crate) trait Node: ToString {
+impl_as_any!(
+    Program,
+    CallExpression,
+    BlockStatement,
+    Identifier,
+    LetStatement,
+    ReturnStatement,
+    IntegerLiteral,
+    PrefixExpression,
+    InfixExpression,
+    IfExpression,
+    Boolean,
+    FunctionLiteral,
+    ExpressionStatement,
+);
+
+pub(crate) trait Node: ToString + AsAny {
     fn token_literal(&self) -> String;
 }
 
 /// 语句，比如 let x = 5;
 /// 不产生值
-pub(crate) trait Statement: Node + std::fmt::Debug {
-    fn as_any(&self) -> &dyn std::any::Any;
-}
+pub(crate) trait Statement: Node + std::fmt::Debug {}
 
 /// 表达式，比如 x + 5
 /// 会产生值
-pub(crate) trait Expression: Node + std::fmt::Debug {
-    fn as_any(&self) -> &dyn std::any::Any;
-}
+pub(crate) trait Expression: Node + std::fmt::Debug {}
 
 /// 语法树的根节点
 #[derive(Debug)]
@@ -50,11 +62,7 @@ pub(crate) struct Identifier {
     pub(crate) value: String,
 }
 
-impl Expression for Identifier {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for Identifier {}
 
 impl Node for Identifier {
     fn token_literal(&self) -> String {
@@ -78,11 +86,7 @@ pub struct LetStatement {
     pub(crate) value: Option<Box<dyn Expression>>,
 }
 
-impl Statement for LetStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Statement for LetStatement {}
 
 impl Node for LetStatement {
     fn token_literal(&self) -> String {
@@ -116,11 +120,7 @@ pub struct ReturnStatement {
     pub(crate) return_value: Option<Box<dyn Expression>>,
 }
 
-impl Statement for ReturnStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Statement for ReturnStatement {}
 
 impl Node for ReturnStatement {
     fn token_literal(&self) -> String {
@@ -151,11 +151,7 @@ pub struct ExpressionStatement {
     pub(crate) expression: Option<Box<dyn Expression>>,
 }
 
-impl Statement for ExpressionStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Statement for ExpressionStatement {}
 
 impl Node for ExpressionStatement {
     fn token_literal(&self) -> String {
@@ -180,11 +176,7 @@ pub struct IntegerLiteral {
     pub(crate) value: i64,
 }
 
-impl Expression for IntegerLiteral {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for IntegerLiteral {}
 
 impl Node for IntegerLiteral {
     fn token_literal(&self) -> String {
@@ -197,6 +189,7 @@ impl ToString for IntegerLiteral {
         self.token.literal.clone()
     }
 }
+
 #[derive(Debug)]
 
 /// 前缀表达式
@@ -210,11 +203,7 @@ pub struct PrefixExpression {
     pub(crate) right: Option<Box<dyn Expression>>,
 }
 
-impl Expression for PrefixExpression {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for PrefixExpression {}
 
 impl Node for PrefixExpression {
     fn token_literal(&self) -> String {
@@ -235,6 +224,7 @@ impl ToString for PrefixExpression {
         out
     }
 }
+
 #[derive(Debug)]
 
 /// 中缀表达式
@@ -249,11 +239,7 @@ pub struct InfixExpression {
     pub(crate) right: Option<Box<dyn Expression>>,
 }
 
-impl Expression for InfixExpression {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for InfixExpression {}
 
 impl Node for InfixExpression {
     fn token_literal(&self) -> String {
@@ -279,6 +265,7 @@ impl ToString for InfixExpression {
         out
     }
 }
+
 #[derive(Debug)]
 
 /// 布尔表达式
@@ -289,11 +276,7 @@ pub struct Boolean {
     pub(crate) value: bool,
 }
 
-impl Expression for Boolean {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for Boolean {}
 
 impl Node for Boolean {
     fn token_literal(&self) -> String {
@@ -306,6 +289,7 @@ impl ToString for Boolean {
         self.token.literal.clone()
     }
 }
+
 #[derive(Debug)]
 
 /// 块表达式
@@ -316,11 +300,7 @@ pub struct BlockStatement {
     pub(crate) statements: Vec<Box<dyn Statement>>,
 }
 
-impl Expression for BlockStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for BlockStatement {}
 
 impl Node for BlockStatement {
     fn token_literal(&self) -> String {
@@ -341,6 +321,7 @@ impl ToString for BlockStatement {
         out
     }
 }
+
 #[derive(Debug)]
 
 /// if 表达式 (注意，if 是表达式，可以返回值的，如 if (x > y) {x} else {y})
@@ -353,11 +334,7 @@ pub struct IfExpression {
     pub(crate) alternative: Option<BlockStatement>,
 }
 
-impl Expression for IfExpression {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for IfExpression {}
 
 impl Node for IfExpression {
     fn token_literal(&self) -> String {
@@ -387,6 +364,7 @@ impl ToString for IfExpression {
         out
     }
 }
+
 #[derive(Debug)]
 
 /// 函数表达式
@@ -398,11 +376,7 @@ pub struct FunctionLiteral {
     pub(crate) body: BlockStatement,
 }
 
-impl Expression for FunctionLiteral {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for FunctionLiteral {}
 
 impl Node for FunctionLiteral {
     fn token_literal(&self) -> String {
@@ -432,6 +406,7 @@ impl ToString for FunctionLiteral {
         out
     }
 }
+
 #[derive(Debug)]
 
 /// 函数调用表达式
@@ -445,11 +420,7 @@ pub struct CallExpression {
     pub(crate) arguments: Vec<Box<dyn Expression>>,
 }
 
-impl Expression for CallExpression {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl Expression for CallExpression {}
 
 impl Node for CallExpression {
     fn token_literal(&self) -> String {
