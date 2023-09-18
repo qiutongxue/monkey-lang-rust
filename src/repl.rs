@@ -16,7 +16,7 @@ const PROMPT: &str = ">> ";
 
 use std::io::{self, Write};
 
-use crate::{lexer, parser};
+use crate::{evaluator, lexer, parser};
 
 pub fn start(stdin: io::Stdin) {
     println!("{MONKEY_FACE}");
@@ -40,7 +40,13 @@ pub fn start(stdin: io::Stdin) {
                 continue;
             }
 
-            println!("{}", program.to_string());
+            let evaluated = evaluator::eval(Box::new(program));
+
+            if let Some(e) = evaluated {
+                println!("{}", e.inspect());
+            }
+
+            // println!("{}", program.to_string());
         }
     }
 }
