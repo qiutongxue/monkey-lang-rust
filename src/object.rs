@@ -1,5 +1,7 @@
 use crate::{impl_as_any, AsAny};
 
+impl_as_any!(Integer, Boolean, Null);
+
 pub(crate) trait Object: AsAny {
     fn object_type(&self) -> ObjectType;
     fn inspect(&self) -> String;
@@ -11,6 +13,7 @@ pub(crate) enum ObjectType {
     NULL,
 }
 
+#[derive(Debug)]
 pub(crate) struct Integer {
     pub value: i64,
 }
@@ -25,8 +28,10 @@ impl Object for Integer {
     }
 }
 
-struct Boolean {
-    value: bool,
+#[derive(Debug)]
+
+pub(crate) struct Boolean {
+    pub value: bool,
 }
 
 impl Object for Boolean {
@@ -39,7 +44,9 @@ impl Object for Boolean {
     }
 }
 
-struct Null;
+#[derive(Debug)]
+
+pub(crate) struct Null;
 
 impl Object for Null {
     fn object_type(&self) -> ObjectType {
@@ -50,5 +57,3 @@ impl Object for Null {
         "null".to_string()
     }
 }
-
-impl_as_any!(Integer, Boolean, Null);
