@@ -3,7 +3,7 @@ use crate::{
     object::{Boolean, Integer, Null, Object},
 };
 
-fn eval(node: Box<dyn Node>) -> Box<dyn Object> {
+pub(crate) fn eval(node: Box<dyn Node>) -> Option<Box<dyn Object>> {
     let any = node.as_any();
     // statements
     if let Some(p) = any.downcast_ref::<Program>() {
@@ -15,14 +15,13 @@ fn eval(node: Box<dyn Node>) -> Box<dyn Object> {
 
     // expressions
     if let Some(il) = any.downcast_ref::<IntegerLiteral>() {
-        return Box::new(Integer { value: il.value }) as Box<dyn Object>;
+        return Some(Box::new(Integer { value: il.value }) as Box<dyn Object>);
     }
-    return Box::new(Boolean { value: true }) as Box<dyn Object>;
-
+    return None;
     // panic!("unimplemented");
 }
 
-fn eval_statement(stmt: &Box<dyn Statement>) -> Box<dyn Object> {
+fn eval_statement(stmt: &Box<dyn Statement>) -> Option<Box<dyn Object>> {
     let any = stmt.as_any();
     // statements
     if let Some(p) = any.downcast_ref::<Program>() {
@@ -34,16 +33,16 @@ fn eval_statement(stmt: &Box<dyn Statement>) -> Box<dyn Object> {
     todo!()
 }
 
-fn eval_expression(exp: &Box<dyn Expression>) -> Box<dyn Object> {
+fn eval_expression(exp: &Box<dyn Expression>) -> Option<Box<dyn Object>> {
     let any = exp.as_any();
     if let Some(il) = any.downcast_ref::<IntegerLiteral>() {
-        return Box::new(Integer { value: il.value }) as Box<dyn Object>;
+        return Some(Box::new(Integer { value: il.value }) as Box<dyn Object>);
     }
-    return Box::new(Boolean { value: true }) as Box<dyn Object>;
+    return None;
 }
 
-fn eval_statements(stmts: &[Box<dyn Statement>]) -> Box<dyn Object> {
-    let mut result = Box::new(Null) as Box<dyn Object>;
+fn eval_statements(stmts: &[Box<dyn Statement>]) -> Option<Box<dyn Object>> {
+    let mut result = None;
     for stmt in stmts {
         result = eval_statement(stmt);
     }
@@ -76,7 +75,7 @@ mod test {
 
         println!("{program:?}");
 
-        return eval(Box::new(program));
+        return eval(Box::new(program)).unwrap();
     }
 
     fn test_integer_object(obj: &dyn Object, expected: i64) {
