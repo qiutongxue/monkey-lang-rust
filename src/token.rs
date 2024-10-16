@@ -8,7 +8,7 @@ impl Token {
     pub fn lookup_ident(ident: &str) -> TokenType {
         match KEYWORDS.get(ident) {
             Some(token_type) => *token_type,
-            None => TokenType::IDENT,
+            None => TokenType::Identifier,
         }
     }
 
@@ -29,76 +29,76 @@ impl Token {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TokenType {
-    ILLEGAL, // 非法
+    Illegal, // 非法
     EOF,     // 文件结束
 
     // 标识符 + 各种字面量类型
-    IDENT, // 标识符
-    INT,   // 整型
+    Identifier, // 标识符
+    Int,        // 整型
 
     // 操作符
-    ASSIGN,
-    PLUS,
-    MINUS,
-    BANG,
-    ASTERISK,
-    SLASH,
+    Assign,
+    Plus,
+    Minus,
+    Bang,
+    Asterisk,
+    Slash,
 
     LT,
     GT,
 
     EQ,
-    NOTEQ,
+    NotEQ,
 
     // 分隔符
-    COMMA,
-    SEMICOLON,
+    Comma,
+    Semicolon,
 
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
 
     // 关键字
-    FUNCTION,
-    LET,
-    TRUE,
-    FALSE,
-    IF,
-    ELSE,
-    RETURN,
+    Function,
+    Let,
+    True,
+    False,
+    If,
+    Else,
+    Return,
 }
 
 impl ToString for TokenType {
     fn to_string(&self) -> String {
         match self {
-            TokenType::ILLEGAL => "ILLEGAL",
+            TokenType::Illegal => "ILLEGAL",
             TokenType::EOF => "EOF",
-            TokenType::IDENT => "IDENT",
-            TokenType::INT => "INT",
-            TokenType::ASSIGN => "=",
-            TokenType::PLUS => "+",
-            TokenType::MINUS => "-",
-            TokenType::BANG => "!",
-            TokenType::ASTERISK => "*",
-            TokenType::SLASH => "/",
+            TokenType::Identifier => "IDENT",
+            TokenType::Int => "INT",
+            TokenType::Assign => "=",
+            TokenType::Plus => "+",
+            TokenType::Minus => "-",
+            TokenType::Bang => "!",
+            TokenType::Asterisk => "*",
+            TokenType::Slash => "/",
             TokenType::LT => "<",
             TokenType::GT => ">",
             TokenType::EQ => "==",
-            TokenType::NOTEQ => "!=",
-            TokenType::COMMA => ",",
-            TokenType::SEMICOLON => ";",
-            TokenType::LPAREN => "(",
-            TokenType::RPAREN => ")",
-            TokenType::LBRACE => "{",
-            TokenType::RBRACE => "}",
-            TokenType::FUNCTION => "FUNCTION",
-            TokenType::LET => "LET",
-            TokenType::TRUE => "TRUE",
-            TokenType::FALSE => "FALSE",
-            TokenType::IF => "IF",
-            TokenType::ELSE => "ELSE",
-            TokenType::RETURN => "RETURN",
+            TokenType::NotEQ => "!=",
+            TokenType::Comma => ",",
+            TokenType::Semicolon => ";",
+            TokenType::LParen => "(",
+            TokenType::RParen => ")",
+            TokenType::LBrace => "{",
+            TokenType::RBrace => "}",
+            TokenType::Function => "FUNCTION",
+            TokenType::Let => "LET",
+            TokenType::True => "TRUE",
+            TokenType::False => "FALSE",
+            TokenType::If => "IF",
+            TokenType::Else => "ELSE",
+            TokenType::Return => "RETURN",
         }
         .to_string()
     }
@@ -107,13 +107,13 @@ impl ToString for TokenType {
 lazy_static::lazy_static!(
     pub static ref KEYWORDS: std::collections::HashMap<&'static str, TokenType> = {
         let mut map = std::collections::HashMap::new();
-        map.insert("fn", TokenType::FUNCTION);
-        map.insert("let", TokenType::LET);
-        map.insert("true", TokenType::TRUE);
-        map.insert("false", TokenType::FALSE);
-        map.insert("if", TokenType::IF);
-        map.insert("else", TokenType::ELSE);
-        map.insert("return", TokenType::RETURN);
+        map.insert("fn", TokenType::Function);
+        map.insert("let", TokenType::Let);
+        map.insert("true", TokenType::True);
+        map.insert("false", TokenType::False);
+        map.insert("if", TokenType::If);
+        map.insert("else", TokenType::Else);
+        map.insert("return", TokenType::Return);
         map
     };
 );

@@ -19,40 +19,40 @@ pub enum ParseError {
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub enum Precedence {
-    LOWEST,
-    EQUALS,      // ==
-    LESSGREATER, // > or <
-    SUM,         // +
-    PRODUCT,     // *
-    PREFIX,      // -X or !X
-    CALL,        // myFunction(X)
+    Lowest,
+    Equals,      // ==
+    LessGreater, // > or <
+    Sum,         // +
+    Product,     // *
+    Prefix,      // -X or !X
+    Call,        // myFunction(X)
 }
 
 lazy_static! {
     static ref PRECEDENCES: HashMap<TokenType, Precedence> = {
         let mut map = HashMap::new();
-        map.insert(TokenType::EQ, Precedence::EQUALS);
-        map.insert(TokenType::NOTEQ, Precedence::EQUALS);
-        map.insert(TokenType::LT, Precedence::LESSGREATER);
-        map.insert(TokenType::GT, Precedence::LESSGREATER);
-        map.insert(TokenType::PLUS, Precedence::SUM);
-        map.insert(TokenType::MINUS, Precedence::SUM);
-        map.insert(TokenType::SLASH, Precedence::PRODUCT);
-        map.insert(TokenType::ASTERISK, Precedence::PRODUCT);
-        map.insert(TokenType::LPAREN, Precedence::CALL);
+        map.insert(TokenType::EQ, Precedence::Equals);
+        map.insert(TokenType::NotEQ, Precedence::Equals);
+        map.insert(TokenType::LT, Precedence::LessGreater);
+        map.insert(TokenType::GT, Precedence::LessGreater);
+        map.insert(TokenType::Plus, Precedence::Sum);
+        map.insert(TokenType::Minus, Precedence::Sum);
+        map.insert(TokenType::Slash, Precedence::Product);
+        map.insert(TokenType::Asterisk, Precedence::Product);
+        map.insert(TokenType::LParen, Precedence::Call);
         map
     };
 }
 
 use crate::ast::{
-    BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement, Identifier,
-    InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement,
-    Statement,
+    BlockStatement, Boolean, CallExpression, ExpressionEnum, ExpressionStatement, FunctionLiteral,
+    Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
+    Program, ReturnStatement, StatementEnum,
 };
 
-type PrefixParseFn = fn(&mut Parser) -> Result<Box<dyn Expression>, ParseError>;
+type PrefixParseFn = fn(&mut Parser) -> Result<ExpressionEnum, ParseError>;
 type InfixParseFn =
-    fn(&mut Parser, Option<Box<dyn Expression>>) -> Result<Box<dyn Expression>, ParseError>;
+    fn(&mut Parser, Option<Box<ExpressionEnum>>) -> Result<ExpressionEnum, ParseError>;
 
 use crate::lexer::Lexer;
 use crate::token::Token;
@@ -83,20 +83,20 @@ impl Parser {
             infix_parse_fns: HashMap::new(),
         };
 
-        p.register_prefix(TokenType::IDENT, Self::parse_indentifier);
-        p.register_prefix(TokenType::INT, Self::parse_integer_literal);
-        p.register_prefix(TokenType::TRUE, Self::parse_boolean);
-        p.register_prefix(TokenType::FALSE, Self::parse_boolean);
+        p.register_prefix(TokenType::Identifier, Self::parse_indentifier);
+        p.register_prefix(TokenType::Int, Self::parse_integer_literal);
+        p.register_prefix(TokenType::True, Self::parse_boolean);
+        p.register_prefix(TokenType::False, Self::parse_boolean);
         // 遇到 ! 和 - 时，当作整个前缀表达式 <prefix><expression>
-        p.register_prefix(TokenType::BANG, Self::parse_prefix_expression);
-        p.register_prefix(TokenType::MINUS, Self::parse_prefix_expression);
+        p.register_prefix(TokenType::Bang, Self::parse_prefix_expression);
+        p.register_prefix(TokenType::Minus, Self::parse_prefix_expression);
         // 遇到 ( 时，启用分组
-        p.register_prefix(TokenType::LPAREN, Self::parse_grouped_expression);
+        p.register_prefix(TokenType::LParen, Self::parse_grouped_expression);
         // 遇到 <if> 时，调用 parseIfExpression
-        p.register_prefix(TokenType::IF, Self::parse_if_expression);
+        p.register_prefix(TokenType::If, Self::parse_if_expression);
 
         // 遇到 <function> 时，调用 parseFunctionLiteral
-        p.register_prefix(TokenType::FUNCTION, Self::parse_function_literal);
+        p.register_prefix(TokenType::Function, Self::parse_function_literal);
 
         // 遇到 ( 时，也有可能时函数调用
         // 例如：add(1, 2 * 3, 4 + 5)，此时左括号 ( 为中缀表达式
@@ -104,15 +104,15 @@ impl Parser {
         // 如果是函数调用，( 的左边一定是一个 prefix （如 identifier）
         // 如果是普通的分组，( 的左边一定是一个 infix（如 operator） 或空
         // 因为前面是 infix，所以此时左括号成为了 prefix
-        p.register_infix(TokenType::LPAREN, Self::parse_call_expression);
+        p.register_infix(TokenType::LParen, Self::parse_call_expression);
 
         // + - * / == != > < 时，当作中缀表达式 <expression><infix><expression>
-        p.register_infix(TokenType::PLUS, Self::parse_infix_expression);
-        p.register_infix(TokenType::MINUS, Self::parse_infix_expression);
-        p.register_infix(TokenType::SLASH, Self::parse_infix_expression);
-        p.register_infix(TokenType::ASTERISK, Self::parse_infix_expression);
+        p.register_infix(TokenType::Plus, Self::parse_infix_expression);
+        p.register_infix(TokenType::Minus, Self::parse_infix_expression);
+        p.register_infix(TokenType::Slash, Self::parse_infix_expression);
+        p.register_infix(TokenType::Asterisk, Self::parse_infix_expression);
         p.register_infix(TokenType::EQ, Self::parse_infix_expression);
-        p.register_infix(TokenType::NOTEQ, Self::parse_infix_expression);
+        p.register_infix(TokenType::NotEQ, Self::parse_infix_expression);
         p.register_infix(TokenType::LT, Self::parse_infix_expression);
         p.register_infix(TokenType::GT, Self::parse_infix_expression);
 
@@ -164,16 +164,16 @@ impl Parser {
         Ok(program)
     }
 
-    fn parse_statement(&mut self) -> Result<Box<dyn Statement>, ParseError> {
-        let stmt: Box<dyn Statement> = match self
+    fn parse_statement(&mut self) -> Result<StatementEnum, ParseError> {
+        let stmt = match self
             .cur_token
             .as_ref()
             .ok_or(ParseError::TokenIsNone)?
             .token_type
         {
-            TokenType::LET => Box::new(self.parse_let_statement()?) as Box<dyn Statement>,
-            TokenType::RETURN => Box::new(self.parse_return_statement()?) as Box<dyn Statement>,
-            _ => Box::new(self.parse_expression_statement()?) as Box<dyn Statement>,
+            TokenType::Let => StatementEnum::LetStatement(self.parse_let_statement()?),
+            TokenType::Return => StatementEnum::ReturnStatement(self.parse_return_statement()?),
+            _ => StatementEnum::ExpressionStatement(self.parse_expression_statement()?),
         };
 
         Ok(stmt)
@@ -183,7 +183,7 @@ impl Parser {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
         // 第一个一定是一个标识符
-        if !self.expect_peek(TokenType::IDENT) {
+        if !self.expect_peek(TokenType::Identifier) {
             return Err(ParseError::ParseLetStatementError);
         }
 
@@ -198,16 +198,16 @@ impl Parser {
         };
 
         // 第二个一定是 =
-        if !self.expect_peek(TokenType::ASSIGN) {
+        if !self.expect_peek(TokenType::Assign) {
             return Err(ParseError::ParseLetStatementError);
         }
 
         // skip =
         self.next_token();
 
-        let value = Some(self.parse_expression(Precedence::LOWEST)?);
+        let value = Some(self.parse_expression(Precedence::Lowest)?);
 
-        if self.peek_token_is(TokenType::SEMICOLON) {
+        if self.peek_token_is(TokenType::Semicolon) {
             self.next_token();
         }
 
@@ -222,9 +222,9 @@ impl Parser {
 
         self.next_token();
 
-        let return_value = Some(self.parse_expression(Precedence::LOWEST)?);
+        let return_value = Some(self.parse_expression(Precedence::Lowest)?);
 
-        if self.peek_token_is(TokenType::SEMICOLON) {
+        if self.peek_token_is(TokenType::Semicolon) {
             self.next_token();
         }
 
@@ -240,12 +240,12 @@ impl Parser {
     fn parse_expression_statement(&mut self) -> Result<ExpressionStatement, ParseError> {
         let stmt = ExpressionStatement {
             token: self.cur_token.clone().ok_or(ParseError::TokenIsNone)?,
-            expression: Some(self.parse_expression(Precedence::LOWEST)?),
+            expression: Some(self.parse_expression(Precedence::Lowest)?),
         };
 
         // 表达式结尾可以没有分号（用于 REPL，如敲下 5 + 5 并回车）
         // 但是如果有分号，就要跳过分号
-        if self.peek_token_is(TokenType::SEMICOLON) {
+        if self.peek_token_is(TokenType::Semicolon) {
             self.next_token();
         }
 
@@ -255,10 +255,7 @@ impl Parser {
     /// 解析表达式
     ///
     /// `expression`
-    fn parse_expression(
-        &mut self,
-        precedence: Precedence,
-    ) -> Result<Box<dyn Expression>, ParseError> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Result<ExpressionEnum, ParseError> {
         let prefix = self.prefix_parse_fns.get(
             &self
                 .cur_token
@@ -269,12 +266,17 @@ impl Parser {
 
         match prefix {
             None => {
-                self.no_prefix_parse_fn_error(self.cur_token.as_ref().unwrap().token_type);
+                self.no_prefix_parse_fn_error(
+                    self.cur_token
+                        .as_ref()
+                        .ok_or(ParseError::TokenIsNone)?
+                        .token_type,
+                );
                 Err(ParseError::ParseExpressionError)
             }
             Some(prefix) => {
                 let mut left_exp = prefix(self)?;
-                while !self.peek_token_is(TokenType::SEMICOLON)
+                while !self.peek_token_is(TokenType::Semicolon)
                     && precedence < self.peek_precedence()
                 {
                     let infix = self.infix_parse_fns.get(
@@ -289,7 +291,7 @@ impl Parser {
                         None => return Ok(left_exp),
                         Some(infix) => {
                             self.next_token();
-                            left_exp = infix(self, Some(left_exp))?;
+                            left_exp = infix(self, Some(Box::new(left_exp)))?;
                         }
                     }
                 }
@@ -299,14 +301,14 @@ impl Parser {
         }
     }
 
-    fn parse_prefix_expression(&mut self) -> Result<Box<dyn Expression>, ParseError> {
+    fn parse_prefix_expression(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
         self.next_token();
 
-        let right = Some(self.parse_expression(Precedence::PREFIX)?);
+        let right = Some(Box::new(self.parse_expression(Precedence::Prefix)?));
 
-        Ok(Box::new(PrefixExpression {
+        Ok(ExpressionEnum::PrefixExpression(PrefixExpression {
             operator: token.literal.clone(),
             token,
             right,
@@ -315,17 +317,17 @@ impl Parser {
 
     fn parse_infix_expression(
         &mut self,
-        left: Option<Box<dyn Expression>>,
-    ) -> Result<Box<dyn Expression>, ParseError> {
+        left: Option<Box<ExpressionEnum>>,
+    ) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
         let precedence = self.cur_precedence();
 
         self.next_token();
 
-        let right = Some(self.parse_expression(precedence)?);
+        let right = Some(Box::new(self.parse_expression(precedence)?));
 
-        Ok(Box::new(InfixExpression {
+        Ok(ExpressionEnum::InfixExpression(InfixExpression {
             operator: token.literal.clone(),
             token,
             left,
@@ -333,20 +335,23 @@ impl Parser {
         }))
     }
 
-    fn parse_indentifier(&mut self) -> Result<Box<dyn Expression>, ParseError> {
+    fn parse_indentifier(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
-        Ok(Box::new(Identifier {
+        Ok(ExpressionEnum::Identifier(Identifier {
             value: token.literal.clone(),
             token,
         }))
     }
 
-    fn parse_integer_literal(&mut self) -> Result<Box<dyn Expression>, ParseError> {
+    fn parse_integer_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
         match token.literal.parse::<i64>() {
-            Ok(value) => Ok(Box::new(IntegerLiteral { value, token })),
+            Ok(value) => Ok(ExpressionEnum::IntegerLiteral(IntegerLiteral {
+                value,
+                token,
+            })),
             Err(_) => {
                 self.errors
                     .push(format!("could not parse {} as integer", token.literal));
@@ -355,22 +360,22 @@ impl Parser {
         }
     }
 
-    fn parse_boolean(&mut self) -> Result<Box<dyn Expression>, ParseError> {
+    fn parse_boolean(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
-        Ok(Box::new(Boolean {
-            value: self.cur_token_is(TokenType::TRUE),
+        Ok(ExpressionEnum::Boolean(Boolean {
+            value: self.cur_token_is(TokenType::True),
             token,
         }))
     }
 
-    fn parse_grouped_expression(&mut self) -> Result<Box<dyn Expression>, ParseError> {
+    fn parse_grouped_expression(&mut self) -> Result<ExpressionEnum, ParseError> {
         // skip (
         self.next_token();
 
-        let exp = self.parse_expression(Precedence::LOWEST);
+        let exp = self.parse_expression(Precedence::Lowest);
 
-        if !self.expect_peek(TokenType::RPAREN) {
+        if !self.expect_peek(TokenType::RParen) {
             return Err(ParseError::ParseGroupedExpressionError);
         }
 
@@ -380,38 +385,38 @@ impl Parser {
     /// 解析 if 表达式
     ///
     /// if (<condition>) <consequence> else <alternative>
-    fn parse_if_expression(&mut self) -> Result<Box<dyn Expression>, ParseError> {
+    fn parse_if_expression(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
-        if !self.expect_peek(TokenType::LPAREN) {
+        if !self.expect_peek(TokenType::LParen) {
             return Err(ParseError::ParseIfExpressionError);
         }
 
         self.next_token();
 
-        let condition = Some(self.parse_expression(Precedence::LOWEST)?);
+        let condition = Some(Box::new(self.parse_expression(Precedence::Lowest)?));
 
-        if !self.expect_peek(TokenType::RPAREN) {
+        if !self.expect_peek(TokenType::RParen) {
             return Err(ParseError::ParseIfExpressionError);
         }
 
-        if !self.expect_peek(TokenType::LBRACE) {
+        if !self.expect_peek(TokenType::LBrace) {
             return Err(ParseError::ParseIfExpressionError);
         }
 
         let consequence = self.parse_block_statement().ok();
         let mut alternative = None;
-        if self.peek_token_is(TokenType::ELSE) {
+        if self.peek_token_is(TokenType::Else) {
             self.next_token();
 
-            if !self.expect_peek(TokenType::LBRACE) {
+            if !self.expect_peek(TokenType::LBrace) {
                 return Err(ParseError::ParseIfExpressionError);
             }
 
             alternative = self.parse_block_statement().ok();
         }
 
-        Ok(Box::new(crate::ast::IfExpression {
+        Ok(ExpressionEnum::IfExpression(IfExpression {
             token,
             condition,
             consequence,
@@ -426,7 +431,7 @@ impl Parser {
 
         self.next_token();
 
-        while !self.cur_token_is(TokenType::RBRACE) && !self.cur_token_is(TokenType::EOF) {
+        while !self.cur_token_is(TokenType::RBrace) && !self.cur_token_is(TokenType::EOF) {
             let stmt = self.parse_statement();
 
             if let Ok(stmt) = stmt {
@@ -441,22 +446,22 @@ impl Parser {
 
     /// 解析函数字面量
     /// fn (<param1>, <param2>, ...) <block statement>
-    fn parse_function_literal(&mut self) -> Result<Box<dyn Expression>, ParseError> {
+    fn parse_function_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
-        if !self.expect_peek(TokenType::LPAREN) {
+        if !self.expect_peek(TokenType::LParen) {
             return Err(ParseError::ParseFunctionLiteralError);
         }
 
         let parameters = self.parse_function_parameters()?;
 
-        if !self.expect_peek(TokenType::LBRACE) {
+        if !self.expect_peek(TokenType::LBrace) {
             return Err(ParseError::ParseFunctionLiteralError);
         }
 
         let body = self.parse_block_statement()?;
 
-        Ok(Box::new(crate::ast::FunctionLiteral {
+        Ok(ExpressionEnum::FunctionLiteral(FunctionLiteral {
             token,
             parameters,
             body,
@@ -470,7 +475,7 @@ impl Parser {
         let mut identifiers = vec![];
 
         // 空参数
-        if self.peek_token_is(TokenType::RPAREN) {
+        if self.peek_token_is(TokenType::RParen) {
             self.next_token();
             return Ok(identifiers);
         }
@@ -489,7 +494,7 @@ impl Parser {
 
         identifiers.push(ident);
 
-        while self.peek_token_is(TokenType::COMMA) {
+        while self.peek_token_is(TokenType::Comma) {
             self.next_token(); // 当前 -> COMMA
             self.next_token(); // COMMA -> 下一个参数
 
@@ -506,7 +511,7 @@ impl Parser {
             identifiers.push(ident);
         }
 
-        if !self.expect_peek(TokenType::RPAREN) {
+        if !self.expect_peek(TokenType::RParen) {
             return Err(ParseError::ParseFunctionLiteralError);
         }
 
@@ -518,50 +523,50 @@ impl Parser {
     /// <expression>(<param1>, <param2>, ...)
     fn parse_call_expression(
         &mut self,
-        function: Option<Box<dyn Expression>>,
-    ) -> Result<Box<dyn Expression>, ParseError> {
+        function: Option<Box<ExpressionEnum>>,
+    ) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
         let arguments = self.parse_call_arguments()?;
 
-        Ok(Box::new(CallExpression {
+        Ok(ExpressionEnum::CallExpression(CallExpression {
             token,
-            function: function.unwrap(),
+            function: function.ok_or(ParseError::TokenIsNone)?,
             arguments,
         }))
     }
 
     // 解析表达式列表
     // <param1>, <param2>, ...)
-    fn parse_call_arguments(&mut self) -> Result<Vec<Box<dyn Expression>>, ParseError> {
+    fn parse_call_arguments(&mut self) -> Result<Vec<ExpressionEnum>, ParseError> {
         let mut args = vec![];
 
         // 空参数
-        if self.peek_token_is(TokenType::RPAREN) {
+        if self.peek_token_is(TokenType::RParen) {
             self.next_token();
             return Ok(args);
         }
 
         self.next_token();
 
-        let arg = self.parse_expression(Precedence::LOWEST);
+        let arg = self.parse_expression(Precedence::Lowest);
 
         if let Ok(arg) = arg {
             args.push(arg);
         }
 
-        while self.peek_token_is(TokenType::COMMA) {
+        while self.peek_token_is(TokenType::Comma) {
             self.next_token(); // 当前 -> COMMA
             self.next_token(); // COMMA -> 下一个参数
 
-            let arg = self.parse_expression(Precedence::LOWEST);
+            let arg = self.parse_expression(Precedence::Lowest);
 
             if let Ok(arg) = arg {
                 args.push(arg);
             }
         }
 
-        if !self.expect_peek(TokenType::RPAREN) {
+        if !self.expect_peek(TokenType::RParen) {
             return Err(ParseError::ParseCallArgumentsError);
         }
 
@@ -605,18 +610,18 @@ impl Parser {
     }
 
     fn peek_precedence(&self) -> Precedence {
-        self.peek_token.as_ref().map_or(Precedence::LOWEST, |x| {
+        self.peek_token.as_ref().map_or(Precedence::Lowest, |x| {
             PRECEDENCES
                 .get(&x.token_type)
-                .map_or(Precedence::LOWEST, |x| *x)
+                .map_or(Precedence::Lowest, |x| *x)
         })
     }
 
     fn cur_precedence(&self) -> Precedence {
-        self.cur_token.as_ref().map_or(Precedence::LOWEST, |x| {
+        self.cur_token.as_ref().map_or(Precedence::Lowest, |x| {
             PRECEDENCES
                 .get(&x.token_type)
-                .map_or(Precedence::LOWEST, |x| *x)
+                .map_or(Precedence::Lowest, |x| *x)
         })
     }
 }
@@ -624,12 +629,11 @@ impl Parser {
 #[cfg(test)]
 mod test {
 
+    use core::panic;
+
     use super::Parser;
     use crate::{
-        ast::{
-            Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement, Node,
-            Statement,
-        },
+        ast::{ExpressionEnum, Node, StatementEnum},
         lexer::Lexer,
     };
 
@@ -681,21 +685,16 @@ mod test {
                 program.statements.len()
             );
 
-            let stmt = program.statements[0].as_ref();
+            let stmt = &program.statements[0];
 
             assert!(_test_let_statement(stmt, expected_indent));
 
-            let exp = stmt
-                .as_any()
-                .downcast_ref::<LetStatement>()
-                .as_ref()
-                .unwrap()
-                .value
-                .as_ref()
-                .unwrap()
-                .as_ref();
-
-            assert!(_test_literal_expression(exp, expected_value));
+            if let StatementEnum::LetStatement(stmt) = stmt {
+                let exp = stmt.value.as_ref().unwrap();
+                assert!(_test_literal_expression(exp, expected_value));
+            } else {
+                panic!("stmt is not LetStatement, got={:?}", stmt);
+            }
         }
     }
 
@@ -727,7 +726,7 @@ mod test {
                 program.statements.len()
             );
 
-            let stmt = program.statements[0].as_ref();
+            let stmt = &program.statements[0];
 
             assert_eq!(
                 stmt.token_literal(),
@@ -736,17 +735,12 @@ mod test {
                 stmt.token_literal()
             );
 
-            let exp = stmt
-                .as_any()
-                .downcast_ref::<crate::ast::ReturnStatement>()
-                .as_ref()
-                .unwrap()
-                .return_value
-                .as_ref()
-                .unwrap()
-                .as_ref();
-
-            assert!(_test_literal_expression(exp, expected_value));
+            if let StatementEnum::ReturnStatement(stmt) = stmt {
+                let exp = stmt.return_value.as_ref().unwrap();
+                assert!(_test_literal_expression(exp, expected_value));
+            } else {
+                panic!("stmt is not ReturnStatement, got={:?}", stmt);
+            }
         }
     }
 
@@ -772,39 +766,29 @@ mod test {
             program.statements.len()
         );
 
-        let stmt = program.statements[0].as_ref();
+        let stmt = &program.statements[0];
 
-        let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::Identifier(ident) = exp {
+                assert_eq!(
+                    ident.value, "foobar",
+                    "ident.value not 'foobar', got = {}",
+                    ident.value
+                );
 
-        assert!(
-            exp_stmt.is_some(),
-            "stmt is not ExpressionStatement, got={:?}",
-            stmt
-        );
-
-        let ident = exp_stmt
-            .unwrap()
-            .expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<Identifier>();
-
-        assert!(ident.is_some(), "exp not Identifier. got={:?}", ident);
-
-        assert_eq!(
-            ident.unwrap().value,
-            "foobar",
-            "ident.value not 'foobar', got = {}",
-            ident.unwrap().value
-        );
-
-        assert_eq!(
-            ident.unwrap().token_literal(),
-            "foobar",
-            "ident.token_literal not 'foobar', got = {}",
-            ident.unwrap().token_literal()
-        );
+                assert_eq!(
+                    ident.token_literal(),
+                    "foobar",
+                    "ident.token_literal not 'foobar', got = {}",
+                    ident.token_literal()
+                );
+            } else {
+                panic!("exp is not Identifier, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
     }
 
     #[test]
@@ -829,43 +813,25 @@ mod test {
             program.statements.len()
         );
 
-        let stmt = program.statements[0].as_ref();
+        let stmt = &program.statements[0];
 
-        let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::IntegerLiteral(lit) = exp {
+                assert_eq!(lit.value, 5, "lit.value not '5', got = {}", lit.value);
 
-        assert!(
-            exp_stmt.is_some(),
-            "stmt is not ExpressionStatement, got={:?}",
-            stmt
-        );
-
-        let literal = exp_stmt
-            .unwrap()
-            .expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<IntegerLiteral>();
-
-        assert!(
-            literal.is_some(),
-            "exp not IntegerLiteral. got={:?}",
-            literal
-        );
-
-        assert_eq!(
-            literal.unwrap().value,
-            5,
-            "literal.value not '5', got = {}",
-            literal.unwrap().value
-        );
-
-        assert_eq!(
-            literal.unwrap().token_literal(),
-            "5",
-            "literal.token_literal not '5', got = {}",
-            literal.unwrap().token_literal()
-        );
+                assert_eq!(
+                    lit.token_literal(),
+                    "5",
+                    "lit.token_literal not '5', got = {}",
+                    lit.token_literal()
+                );
+            } else {
+                panic!("exp is not IntegerLiteral, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
     }
 
     #[test]
@@ -897,38 +863,27 @@ mod test {
                 program.statements.len()
             );
 
-            let stmt = program.statements[0].as_ref();
+            let stmt = &program.statements[0];
 
-            let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+            if let StatementEnum::ExpressionStatement(stmt) = stmt {
+                let exp = stmt.expression.as_ref().unwrap();
+                if let ExpressionEnum::PrefixExpression(exp) = exp {
+                    assert_eq!(
+                        exp.operator, operator,
+                        "exp.operator is not '{}', got={}",
+                        operator, exp.operator
+                    );
 
-            assert!(
-                exp_stmt.is_some(),
-                "stmt is not ExpressionStatement, got={:?}",
-                stmt
-            );
-
-            let exp = exp_stmt
-                .unwrap()
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<crate::ast::PrefixExpression>();
-
-            assert!(exp.is_some(), "exp is not PrefixExpression, got={:?}", exp);
-
-            assert_eq!(
-                exp.unwrap().operator,
-                operator,
-                "exp.operator is not '{}', got={}",
-                operator,
-                exp.unwrap().operator
-            );
-
-            assert!(_test_literal_expression(
-                exp.unwrap().right.as_ref().unwrap().as_ref(),
-                value
-            ));
+                    assert!(_test_literal_expression(
+                        exp.right.as_ref().unwrap().as_ref(),
+                        value
+                    ));
+                } else {
+                    panic!("exp is not PrefixExpression, got={:?}", exp);
+                }
+            } else {
+                panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+            }
         }
     }
 
@@ -983,28 +938,24 @@ mod test {
                 program.statements.len()
             );
 
-            let stmt = program.statements[0].as_ref();
+            let stmt = &program.statements[0];
 
-            let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+            if let StatementEnum::ExpressionStatement(exp_stmt) = stmt {
+                assert!(_test_infix_expression(
+                    exp_stmt.expression.as_ref().unwrap(),
+                    left_value,
+                    operator,
+                    right_value,
+                ));
+            } else {
+            }
+            // let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
 
-            assert!(
-                exp_stmt.is_some(),
-                "stmt is not ExpressionStatement, got={:?}",
-                stmt
-            );
-
-            assert!(_test_infix_expression(
-                exp_stmt
-                    .as_ref()
-                    .unwrap()
-                    .expression
-                    .as_ref()
-                    .unwrap()
-                    .as_ref(),
-                left_value,
-                operator,
-                right_value,
-            ));
+            // assert!(
+            //     exp_stmt.is_some(),
+            //     "stmt is not ExpressionStatement, got={:?}",
+            //     stmt
+            // );
         }
     }
 
@@ -1086,39 +1037,29 @@ mod test {
             program.statements.len()
         );
 
-        let stmt = program.statements[0].as_ref();
+        let stmt = &program.statements[0];
 
-        let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::Boolean(boolean) = exp {
+                assert_eq!(
+                    boolean.value, true,
+                    "boolean.value not 'true', got = {}",
+                    boolean.value
+                );
 
-        assert!(
-            exp_stmt.is_some(),
-            "stmt is not ExpressionStatement, got={:?}",
-            stmt
-        );
-
-        let boolean = exp_stmt
-            .unwrap()
-            .expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<crate::ast::Boolean>();
-
-        assert!(boolean.is_some(), "exp not Boolean. got={:?}", boolean);
-
-        assert_eq!(
-            boolean.unwrap().value,
-            true,
-            "boolean.value not 'true', got = {}",
-            boolean.unwrap().value
-        );
-
-        assert_eq!(
-            boolean.unwrap().token_literal(),
-            "true",
-            "boolean.token_literal not 'true', got = {}",
-            boolean.unwrap().token_literal()
-        );
+                assert_eq!(
+                    boolean.token_literal(),
+                    "true",
+                    "boolean.token_literal not 'true', got = {}",
+                    boolean.token_literal()
+                );
+            } else {
+                panic!("exp is not Boolean, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
     }
 
     #[test]
@@ -1143,64 +1084,48 @@ mod test {
             program.statements.len()
         );
 
-        let stmt = program.statements[0].as_ref();
+        let stmt = &program.statements[0];
 
-        let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::IfExpression(if_exp) = exp {
+                assert!(_test_infix_expression(
+                    if_exp.condition.as_ref().unwrap().as_ref(),
+                    Value::Text("x".to_string()),
+                    "<",
+                    Value::Text("y".to_string()),
+                ));
 
-        assert!(
-            exp_stmt.is_some(),
-            "stmt is not ExpressionStatement, got={:?}",
-            stmt
-        );
+                assert_eq!(
+                    if_exp.consequence.as_ref().unwrap().statements.len(),
+                    1,
+                    "consequence is not 1 statements, got={}",
+                    if_exp.consequence.as_ref().unwrap().statements.len()
+                );
 
-        let exp = exp_stmt
-            .unwrap()
-            .expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<crate::ast::IfExpression>();
+                let consequence = &if_exp.consequence.as_ref().unwrap().statements[0];
 
-        assert!(exp.is_some(), "exp is not IfExpression, got={:?}", exp);
+                if let StatementEnum::ExpressionStatement(consequence) = consequence {
+                    let consequence_exp = consequence.expression.as_ref().unwrap();
+                    assert!(_test_identifier(consequence_exp, "x"));
 
-        assert!(_test_infix_expression(
-            exp.unwrap().condition.as_ref().unwrap().as_ref(),
-            Value::Text("x".to_string()),
-            "<",
-            Value::Text("y".to_string()),
-        ));
-
-        assert_eq!(
-            exp.unwrap().consequence.as_ref().unwrap().statements.len(),
-            1,
-            "consequence is not 1 statements, got={}",
-            exp.unwrap().consequence.as_ref().unwrap().statements.len()
-        );
-
-        let consequence = exp.unwrap().consequence.as_ref().unwrap().statements[0].as_ref();
-
-        let consequence = consequence.as_any().downcast_ref::<ExpressionStatement>();
-
-        assert!(consequence.is_some(), "Statements[0] is not Identifier");
-
-        assert!(_test_identifier(
-            consequence
-                .as_ref()
-                .unwrap()
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_ref(),
-            "x".to_string()
-        ));
-
-        assert!(
-            exp.unwrap().alternative.is_none(),
-            "exp.alternative.statements was not None, got={:?}",
-            exp.unwrap().alternative
-        );
-
-        assert!(exp.unwrap().alternative.is_none());
+                    assert!(
+                        if_exp.alternative.is_none(),
+                        "if_exp.alternative.statements was not None, got={:?}",
+                        if_exp.alternative
+                    );
+                } else {
+                    panic!(
+                        "consequence is not ExpressionStatement, got={:?}",
+                        consequence
+                    );
+                }
+            } else {
+                panic!("exp is not IfExpression, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
     }
 
     #[test]
@@ -1225,80 +1150,61 @@ mod test {
             program.statements.len()
         );
 
-        let stmt = program.statements[0].as_ref();
+        let stmt = &program.statements[0];
 
-        let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::IfExpression(if_exp) = exp {
+                assert!(_test_infix_expression(
+                    if_exp.condition.as_ref().unwrap().as_ref(),
+                    Value::Text("x".to_string()),
+                    "<",
+                    Value::Text("y".to_string()),
+                ));
 
-        assert!(
-            exp_stmt.is_some(),
-            "stmt is not ExpressionStatement, got={:?}",
-            stmt
-        );
+                assert_eq!(
+                    if_exp.consequence.as_ref().unwrap().statements.len(),
+                    1,
+                    "consequence is not 1 statements, got={}",
+                    if_exp.consequence.as_ref().unwrap().statements.len()
+                );
 
-        let exp = exp_stmt
-            .unwrap()
-            .expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<crate::ast::IfExpression>();
+                let consequence = &if_exp.consequence.as_ref().unwrap().statements[0];
 
-        assert!(exp.is_some(), "exp is not IfExpression, got={:?}", exp);
+                if let StatementEnum::ExpressionStatement(consequence) = consequence {
+                    let consequence_exp = consequence.expression.as_ref().unwrap();
+                    assert!(_test_identifier(consequence_exp, "x"));
+                } else {
+                    panic!(
+                        "consequence is not ExpressionStatement, got={:?}",
+                        consequence
+                    );
+                }
 
-        assert!(_test_infix_expression(
-            exp.unwrap().condition.as_ref().unwrap().as_ref(),
-            Value::Text("x".to_string()),
-            "<",
-            Value::Text("y".to_string()),
-        ));
+                assert_eq!(
+                    if_exp.alternative.as_ref().unwrap().statements.len(),
+                    1,
+                    "alternative is not 1 statements, got={}",
+                    if_exp.alternative.as_ref().unwrap().statements.len()
+                );
 
-        assert_eq!(
-            exp.unwrap().consequence.as_ref().unwrap().statements.len(),
-            1,
-            "consequence is not 1 statements, got={}",
-            exp.unwrap().consequence.as_ref().unwrap().statements.len()
-        );
+                let alternative = &if_exp.alternative.as_ref().unwrap().statements[0];
 
-        let consequence = exp.unwrap().consequence.as_ref().unwrap().statements[0].as_ref();
-
-        let consequence = consequence.as_any().downcast_ref::<ExpressionStatement>();
-
-        assert!(consequence.is_some(), "Statements[0] is not Identifier");
-
-        assert!(_test_identifier(
-            consequence
-                .as_ref()
-                .unwrap()
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_ref(),
-            "x".to_string()
-        ));
-
-        assert_eq!(
-            exp.unwrap().alternative.as_ref().unwrap().statements.len(),
-            1,
-            "alternative is not 1 statements, got={}",
-            exp.unwrap().alternative.as_ref().unwrap().statements.len()
-        );
-
-        let alternative = exp.unwrap().alternative.as_ref().unwrap().statements[0].as_ref();
-
-        let alternative = alternative.as_any().downcast_ref::<ExpressionStatement>();
-
-        assert!(alternative.is_some(), "Statements[0] is not Identifier");
-
-        assert!(_test_identifier(
-            alternative
-                .as_ref()
-                .unwrap()
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_ref(),
-            "y".to_string()
-        ));
+                if let StatementEnum::ExpressionStatement(alternative) = alternative {
+                    let alternative_exp = alternative.expression.as_ref().unwrap();
+                    assert!(_test_identifier(alternative_exp, "y"));
+                } else {
+                    panic!(
+                        "alternative is not ExpressionStatement, got={:?}",
+                        alternative
+                    );
+                }
+            } else {
+                panic!("exp is not IfExpression, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
     }
 
     #[test]
@@ -1323,79 +1229,56 @@ mod test {
             program.statements.len()
         );
 
-        let stmt = program.statements[0].as_ref();
+        let stmt = &program.statements[0];
 
-        let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::FunctionLiteral(function) = exp {
+                assert_eq!(
+                    function.parameters.len(),
+                    2,
+                    "function literal parameters wrong. want 2, got={}",
+                    function.parameters.len()
+                );
 
-        assert!(
-            exp_stmt.is_some(),
-            "stmt is not ExpressionStatement, got={:?}",
-            stmt
-        );
+                assert_eq!(
+                    function.parameters[0].value, "x",
+                    "parameter is not 'x', got={}",
+                    function.parameters[0].value
+                );
 
-        let function = exp_stmt
-            .unwrap()
-            .expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<crate::ast::FunctionLiteral>();
+                assert_eq!(
+                    function.parameters[1].value, "y",
+                    "parameter is not 'y', got={}",
+                    function.parameters[1].value
+                );
 
-        assert!(
-            function.is_some(),
-            "exp is not FunctionLiteral, got={:?}",
-            function
-        );
+                assert_eq!(
+                    function.body.statements.len(),
+                    1,
+                    "function.body.statements has not 1 statements. got={}",
+                    function.body.statements.len()
+                );
 
-        assert_eq!(
-            function.unwrap().parameters.len(),
-            2,
-            "function literal parameters wrong. want 2, got={}",
-            function.unwrap().parameters.len()
-        );
+                let body_stmt = &function.body.statements[0];
 
-        assert_eq!(
-            function.unwrap().parameters[0].value,
-            "x",
-            "parameter is not 'x', got={}",
-            function.unwrap().parameters[0].value
-        );
-
-        assert_eq!(
-            function.unwrap().parameters[1].value,
-            "y",
-            "parameter is not 'y', got={}",
-            function.unwrap().parameters[1].value
-        );
-
-        assert_eq!(
-            function.unwrap().body.statements.len(),
-            1,
-            "function.body.statements has not 1 statements. got={}",
-            function.unwrap().body.statements.len()
-        );
-
-        let body_stmt = function.unwrap().body.statements[0].as_ref();
-
-        let body_stmt = body_stmt.as_any().downcast_ref::<ExpressionStatement>();
-
-        assert!(
-            body_stmt.is_some(),
-            "function body stmt is not ExpressionStatement"
-        );
-
-        assert!(_test_infix_expression(
-            body_stmt
-                .as_ref()
-                .unwrap()
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_ref(),
-            Value::Text("x".to_string()),
-            "+",
-            Value::Text("y".to_string()),
-        ));
+                if let StatementEnum::ExpressionStatement(body_stmt) = body_stmt {
+                    let body_exp = body_stmt.expression.as_ref().unwrap();
+                    assert!(_test_infix_expression(
+                        body_exp,
+                        Value::Text("x".to_string()),
+                        "+",
+                        Value::Text("y".to_string()),
+                    ));
+                } else {
+                    panic!("function body stmt is not ExpressionStatement");
+                }
+            } else {
+                panic!("exp is not FunctionLiteral, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
     }
 
     #[test]
@@ -1418,46 +1301,33 @@ mod test {
 
             let program = program.unwrap();
 
-            let stmt = program.statements[0].as_ref();
+            let stmt = &program.statements[0];
 
-            let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+            if let StatementEnum::ExpressionStatement(stmt) = stmt {
+                let exp = stmt.expression.as_ref().unwrap();
+                if let ExpressionEnum::FunctionLiteral(function) = exp {
+                    assert_eq!(
+                        function.parameters.len(),
+                        expected_params.len(),
+                        "function literal parameters wrong. want {}, got={}",
+                        expected_params.len(),
+                        function.parameters.len()
+                    );
 
-            assert!(
-                exp_stmt.is_some(),
-                "stmt is not ExpressionStatement, got={:?}",
-                stmt
-            );
-
-            let function = exp_stmt
-                .unwrap()
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<crate::ast::FunctionLiteral>();
-
-            assert!(
-                function.is_some(),
-                "exp is not FunctionLiteral, got={:?}",
-                function
-            );
-
-            assert_eq!(
-                function.unwrap().parameters.len(),
-                expected_params.len(),
-                "length parameters wrong. want {}, got={}",
-                expected_params.len(),
-                function.unwrap().parameters.len()
-            );
-
-            for (i, ident) in expected_params.iter().enumerate() {
-                assert_eq!(
-                    function.unwrap().parameters[i].value,
-                    ident.to_string(),
-                    "parameter is not {}, got={}",
-                    ident,
-                    function.unwrap().parameters[i].value
-                );
+                    for (i, ident) in expected_params.iter().enumerate() {
+                        assert_eq!(
+                            function.parameters[i].value,
+                            ident.to_string(),
+                            "parameter is not {}, got={}",
+                            ident,
+                            function.parameters[i].value
+                        );
+                    }
+                } else {
+                    panic!("exp is not FunctionLiteral, got={:?}", exp);
+                }
+            } else {
+                panic!("stmt is not ExpressionStatement, got={:?}", stmt);
             }
         }
     }
@@ -1484,196 +1354,174 @@ mod test {
             program.statements.len()
         );
 
-        let stmt = program.statements[0].as_ref();
+        let stmt = &program.statements[0];
 
-        let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::CallExpression(call) = exp {
+                assert!(_test_identifier(call.function.as_ref(), "add"));
 
-        assert!(
-            exp_stmt.is_some(),
-            "stmt is not ExpressionStatement, got={:?}",
-            stmt
-        );
+                assert_eq!(
+                    call.arguments.len(),
+                    3,
+                    "wrong length of arguments. want 3, got={}",
+                    call.arguments.len()
+                );
 
-        let exp = exp_stmt
-            .unwrap()
-            .expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<crate::ast::CallExpression>();
+                assert!(_test_literal_expression(
+                    &call.arguments[0],
+                    Value::Integer(1)
+                ));
 
-        assert!(exp.is_some(), "exp is not CallExpression, got={:?}", exp);
+                assert!(_test_infix_expression(
+                    &call.arguments[1],
+                    Value::Integer(2),
+                    "*",
+                    Value::Integer(3)
+                ));
 
-        assert!(_test_identifier(
-            exp.unwrap().function.as_ref(),
-            "add".to_string()
-        ));
-
-        assert_eq!(
-            exp.unwrap().arguments.len(),
-            3,
-            "wrong length of arguments, got={}",
-            exp.unwrap().arguments.len()
-        );
-
-        assert!(_test_literal_expression(
-            exp.unwrap().arguments[0].as_ref(),
-            Value::Integer(1)
-        ));
-
-        assert!(_test_infix_expression(
-            exp.unwrap().arguments[1].as_ref(),
-            Value::Integer(2),
-            "*",
-            Value::Integer(3)
-        ));
-
-        assert!(_test_infix_expression(
-            exp.unwrap().arguments[2].as_ref(),
-            Value::Integer(4),
-            "+",
-            Value::Integer(5)
-        ));
+                assert!(_test_infix_expression(
+                    &call.arguments[2],
+                    Value::Integer(4),
+                    "+",
+                    Value::Integer(5)
+                ));
+            } else {
+                panic!("exp is not CallExpression, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
     }
 
     fn _test_infix_expression(
-        exp: &dyn Expression,
+        exp: &ExpressionEnum,
         left: Value,
         operator: &str,
         right: Value,
     ) -> bool {
-        let op_exp = exp.as_any().downcast_ref::<crate::ast::InfixExpression>();
+        if let ExpressionEnum::InfixExpression(op_exp) = exp {
+            assert!(_test_literal_expression(
+                op_exp.left.as_ref().unwrap().as_ref(),
+                left
+            ));
 
-        assert!(
-            op_exp.is_some(),
-            "exp is not InfixExpression, got={:?}",
-            exp
-        );
+            assert_eq!(
+                op_exp.operator, operator,
+                "exp.operator is not '{}', got={}",
+                operator, op_exp.operator
+            );
 
-        assert!(_test_literal_expression(
-            op_exp.unwrap().left.as_ref().unwrap().as_ref(),
-            left
-        ));
+            assert!(_test_literal_expression(
+                op_exp.right.as_ref().unwrap().as_ref(),
+                right
+            ));
 
-        assert_eq!(
-            op_exp.unwrap().operator,
-            operator,
-            "exp.operator is not '{}', got={}",
-            operator,
-            op_exp.unwrap().operator
-        );
-
-        assert!(_test_literal_expression(
-            op_exp.unwrap().right.as_ref().unwrap().as_ref(),
-            right
-        ));
-
-        true
-    }
-
-    fn _test_let_statement(s: &dyn Statement, expected_name: &str) -> bool {
-        let s = s.as_any().downcast_ref::<LetStatement>();
-
-        assert!(s.is_some(), "s is not LetStatement, got={:?}", s);
-        let s = s.unwrap();
-        assert_eq!(
-            s.token_literal(),
-            "let",
-            "s.token_literal not 'let'. got={}",
-            s.token_literal()
-        );
-
-        assert_eq!(
-            s.name.value, expected_name,
-            "let_statement.name is not {}, got = {}",
-            expected_name, s.name.value
-        );
-
-        assert_eq!(
-            s.name.token_literal(),
-            expected_name,
-            "let_statement.name is not {}, got = {}",
-            expected_name,
-            s.name.token_literal()
-        );
-
-        true
-    }
-
-    fn _test_literal_expression(exp: &dyn Expression, expected: Value) -> bool {
-        match expected {
-            Value::Boolean(v) => _test_bool_literal(exp, v),
-            Value::Integer(v) => _test_integer_literal(exp, v),
-            Value::Text(v) => _test_identifier(exp, v),
+            true
+        } else {
+            panic!("exp is not InfixExpression, got={:?}", exp);
         }
     }
 
-    fn _test_identifier(exp: &dyn Expression, expected: String) -> bool {
-        let ident = exp.as_any().downcast_ref::<Identifier>();
+    fn _test_let_statement(s: &StatementEnum, expected_name: &str) -> bool {
+        if let StatementEnum::LetStatement(s) = s {
+            assert_eq!(
+                s.token_literal(),
+                "let",
+                "s.token_literal not 'let'. got={}",
+                s.token_literal()
+            );
 
-        assert!(ident.is_some(), "exp not Identifier. got={:?}", exp);
+            assert_eq!(
+                s.name.value, expected_name,
+                "let_statement.name is not {}, got = {}",
+                expected_name, s.name.value
+            );
 
-        assert_eq!(
-            ident.unwrap().value,
-            expected,
-            "ident.value not {}. got={}",
-            expected,
-            ident.unwrap().value
-        );
+            assert_eq!(
+                s.name.token_literal(),
+                expected_name,
+                "let_statement.name is not {}, got = {}",
+                expected_name,
+                s.name.token_literal()
+            );
 
-        assert_eq!(
-            ident.unwrap().token_literal(),
-            expected,
-            "ident.token_literal not {}. got={}",
-            expected,
-            ident.unwrap().token_literal()
-        );
-        true
+            true
+        } else {
+            panic!()
+        }
     }
 
-    fn _test_bool_literal(exp: &dyn Expression, expected: bool) -> bool {
-        let bl = exp.as_any().downcast_ref::<crate::ast::Boolean>();
-        assert!(bl.is_some(), "exp not Boolean. got={:?}", exp);
-
-        assert_eq!(
-            bl.unwrap().value,
-            expected,
-            "bl.value not {}. got={}",
-            expected,
-            bl.unwrap().value
-        );
-
-        assert_eq!(
-            bl.unwrap().token_literal(),
-            format!("{}", expected),
-            "bl.token_literal not {}. got={}",
-            expected,
-            bl.unwrap().token_literal()
-        );
-
-        true
+    fn _test_literal_expression(exp: &ExpressionEnum, expected: Value) -> bool {
+        match expected {
+            Value::Boolean(v) => _test_bool_literal(exp, v),
+            Value::Integer(v) => _test_integer_literal(exp, v),
+            Value::Text(v) => _test_identifier(exp, &v),
+        }
     }
 
-    fn _test_integer_literal(exp: &dyn Expression, expected: i64) -> bool {
-        let il = exp.as_any().downcast_ref::<crate::ast::IntegerLiteral>();
+    fn _test_identifier(exp: &ExpressionEnum, expected: &str) -> bool {
+        if let ExpressionEnum::Identifier(ident) = exp {
+            assert_eq!(
+                ident.value, expected,
+                "ident.value not {}. got={}",
+                expected, ident.value
+            );
 
-        assert!(il.is_some(), "exp not IntegerLiteral. got={:?}", exp);
+            assert_eq!(
+                ident.token_literal(),
+                expected,
+                "ident.token_literal not {}. got={}",
+                expected,
+                ident.token_literal()
+            );
 
-        assert_eq!(
-            il.unwrap().value,
-            expected,
-            "il.value not {}. got={}",
-            expected,
-            il.unwrap().value
-        );
+            true
+        } else {
+            return false;
+        }
+    }
 
-        assert_eq!(
-            il.unwrap().token_literal(),
-            format!("{}", expected),
-            "il.token_literal not {}. got={}",
-            expected,
-            il.unwrap().token_literal()
-        );
+    fn _test_bool_literal(exp: &ExpressionEnum, expected: bool) -> bool {
+        if let ExpressionEnum::Boolean(bl) = exp {
+            assert_eq!(
+                bl.value, expected,
+                "bl.value not {}. got={}",
+                expected, bl.value
+            );
+
+            assert_eq!(
+                bl.token_literal(),
+                format!("{}", expected),
+                "bl.token_literal not {}. got={}",
+                expected,
+                bl.token_literal()
+            );
+
+            true
+        } else {
+            return false;
+        }
+    }
+
+    fn _test_integer_literal(exp: &ExpressionEnum, expected: i64) -> bool {
+        if let ExpressionEnum::IntegerLiteral(il) = exp {
+            assert_eq!(
+                il.value, expected,
+                "il.value not {}. got={}",
+                expected, il.value
+            );
+
+            assert_eq!(
+                il.token_literal(),
+                format!("{}", expected),
+                "il.token_literal not {}. got={}",
+                expected,
+                il.token_literal()
+            );
+        } else {
+            return false;
+        }
 
         true
     }

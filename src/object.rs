@@ -1,59 +1,28 @@
-use crate::{impl_as_any, AsAny};
+pub enum Object {
+    Integer(i64),
+    Boolean(bool),
+    Null,
+}
 
-impl_as_any!(Integer, Boolean, Null);
-
-pub(crate) trait Object: AsAny {
-    fn object_type(&self) -> ObjectType;
-    fn inspect(&self) -> String;
+impl Object {
+    pub fn object_type(&self) -> ObjectType {
+        match self {
+            Object::Integer(_) => ObjectType::INTEGER,
+            Object::Boolean(_) => ObjectType::BOOLEAN,
+            Object::Null => ObjectType::NULL,
+        }
+    }
+    pub fn inspect(&self) -> String {
+        match self {
+            Object::Integer(v) => v.to_string(),
+            Object::Boolean(v) => v.to_string(),
+            Object::Null => "null".to_string(),
+        }
+    }
 }
 
 pub(crate) enum ObjectType {
     INTEGER,
     BOOLEAN,
     NULL,
-}
-
-#[derive(Debug)]
-pub(crate) struct Integer {
-    pub value: i64,
-}
-
-impl Object for Integer {
-    fn object_type(&self) -> ObjectType {
-        ObjectType::INTEGER
-    }
-
-    fn inspect(&self) -> String {
-        self.value.to_string()
-    }
-}
-
-#[derive(Debug)]
-
-pub(crate) struct Boolean {
-    pub value: bool,
-}
-
-impl Object for Boolean {
-    fn object_type(&self) -> ObjectType {
-        ObjectType::BOOLEAN
-    }
-
-    fn inspect(&self) -> String {
-        self.value.to_string()
-    }
-}
-
-#[derive(Debug)]
-
-pub(crate) struct Null;
-
-impl Object for Null {
-    fn object_type(&self) -> ObjectType {
-        ObjectType::NULL
-    }
-
-    fn inspect(&self) -> String {
-        "null".to_string()
-    }
 }

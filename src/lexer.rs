@@ -33,13 +33,13 @@ impl Lexer {
                     tok = Token::from_str(TokenType::EQ, literal);
                 } else {
                     // =
-                    tok = Token::from_char(TokenType::ASSIGN, self.ch)
+                    tok = Token::from_char(TokenType::Assign, self.ch)
                 }
             }
-            b'+' => tok = Token::from_char(TokenType::PLUS, self.ch),
-            b'-' => tok = Token::from_char(TokenType::MINUS, self.ch),
-            b'*' => tok = Token::from_char(TokenType::ASTERISK, self.ch),
-            b'/' => tok = Token::from_char(TokenType::SLASH, self.ch),
+            b'+' => tok = Token::from_char(TokenType::Plus, self.ch),
+            b'-' => tok = Token::from_char(TokenType::Minus, self.ch),
+            b'*' => tok = Token::from_char(TokenType::Asterisk, self.ch),
+            b'/' => tok = Token::from_char(TokenType::Slash, self.ch),
             b'<' => tok = Token::from_char(TokenType::LT, self.ch),
             b'>' => tok = Token::from_char(TokenType::GT, self.ch),
             b'!' => {
@@ -47,18 +47,18 @@ impl Lexer {
                     // !=
                     self.read_char();
                     let literal = "!=";
-                    tok = Token::from_str(TokenType::NOTEQ, literal);
+                    tok = Token::from_str(TokenType::NotEQ, literal);
                 } else {
                     // !
-                    tok = Token::from_char(TokenType::BANG, self.ch)
+                    tok = Token::from_char(TokenType::Bang, self.ch)
                 }
             }
-            b';' => tok = Token::from_char(TokenType::SEMICOLON, self.ch),
-            b',' => tok = Token::from_char(TokenType::COMMA, self.ch),
-            b'(' => tok = Token::from_char(TokenType::LPAREN, self.ch),
-            b')' => tok = Token::from_char(TokenType::RPAREN, self.ch),
-            b'{' => tok = Token::from_char(TokenType::LBRACE, self.ch),
-            b'}' => tok = Token::from_char(TokenType::RBRACE, self.ch),
+            b';' => tok = Token::from_char(TokenType::Semicolon, self.ch),
+            b',' => tok = Token::from_char(TokenType::Comma, self.ch),
+            b'(' => tok = Token::from_char(TokenType::LParen, self.ch),
+            b')' => tok = Token::from_char(TokenType::RParen, self.ch),
+            b'{' => tok = Token::from_char(TokenType::LBrace, self.ch),
+            b'}' => tok = Token::from_char(TokenType::RBrace, self.ch),
             0 => tok = Token::from_str(TokenType::EOF, ""),
             _ => {
                 if is_letter(self.ch) {
@@ -67,9 +67,9 @@ impl Lexer {
                     return Token::from_str(token_type, &literal);
                 } else if self.ch.is_ascii_digit() {
                     let literal = self.read_number();
-                    return Token::from_str(TokenType::INT, &literal);
+                    return Token::from_str(TokenType::Int, &literal);
                 } else {
-                    tok = Token::from_char(TokenType::ILLEGAL, self.ch);
+                    tok = Token::from_char(TokenType::Illegal, self.ch);
                 }
             }
         }
@@ -150,79 +150,79 @@ mod test {
         ";
 
         let tests = [
-            (TokenType::LET, "let"),
-            (TokenType::IDENT, "five"),
-            (TokenType::ASSIGN, "="),
-            (TokenType::INT, "5"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::LET, "let"),
-            (TokenType::IDENT, "ten"),
-            (TokenType::ASSIGN, "="),
-            (TokenType::INT, "10"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::LET, "let"),
-            (TokenType::IDENT, "add"),
-            (TokenType::ASSIGN, "="),
-            (TokenType::FUNCTION, "fn"),
-            (TokenType::LPAREN, "("),
-            (TokenType::IDENT, "x"),
-            (TokenType::COMMA, ","),
-            (TokenType::IDENT, "y"),
-            (TokenType::RPAREN, ")"),
-            (TokenType::LBRACE, "{"),
-            (TokenType::IDENT, "x"),
-            (TokenType::PLUS, "+"),
-            (TokenType::IDENT, "y"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::RBRACE, "}"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::LET, "let"),
-            (TokenType::IDENT, "result"),
-            (TokenType::ASSIGN, "="),
-            (TokenType::IDENT, "add"),
-            (TokenType::LPAREN, "("),
-            (TokenType::IDENT, "five"),
-            (TokenType::COMMA, ","),
-            (TokenType::IDENT, "ten"),
-            (TokenType::RPAREN, ")"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::BANG, "!"),
-            (TokenType::MINUS, "-"),
-            (TokenType::SLASH, "/"),
-            (TokenType::ASTERISK, "*"),
-            (TokenType::INT, "5"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::INT, "5"),
+            (TokenType::Let, "let"),
+            (TokenType::Identifier, "five"),
+            (TokenType::Assign, "="),
+            (TokenType::Int, "5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Identifier, "ten"),
+            (TokenType::Assign, "="),
+            (TokenType::Int, "10"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Identifier, "add"),
+            (TokenType::Assign, "="),
+            (TokenType::Function, "fn"),
+            (TokenType::LParen, "("),
+            (TokenType::Identifier, "x"),
+            (TokenType::Comma, ","),
+            (TokenType::Identifier, "y"),
+            (TokenType::RParen, ")"),
+            (TokenType::LBrace, "{"),
+            (TokenType::Identifier, "x"),
+            (TokenType::Plus, "+"),
+            (TokenType::Identifier, "y"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::RBrace, "}"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Identifier, "result"),
+            (TokenType::Assign, "="),
+            (TokenType::Identifier, "add"),
+            (TokenType::LParen, "("),
+            (TokenType::Identifier, "five"),
+            (TokenType::Comma, ","),
+            (TokenType::Identifier, "ten"),
+            (TokenType::RParen, ")"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Bang, "!"),
+            (TokenType::Minus, "-"),
+            (TokenType::Slash, "/"),
+            (TokenType::Asterisk, "*"),
+            (TokenType::Int, "5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Int, "5"),
             (TokenType::LT, "<"),
-            (TokenType::INT, "10"),
+            (TokenType::Int, "10"),
             (TokenType::GT, ">"),
-            (TokenType::INT, "5"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::IF, "if"),
-            (TokenType::LPAREN, "("),
-            (TokenType::INT, "5"),
+            (TokenType::Int, "5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::If, "if"),
+            (TokenType::LParen, "("),
+            (TokenType::Int, "5"),
             (TokenType::LT, "<"),
-            (TokenType::INT, "10"),
-            (TokenType::RPAREN, ")"),
-            (TokenType::LBRACE, "{"),
-            (TokenType::RETURN, "return"),
-            (TokenType::TRUE, "true"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::RBRACE, "}"),
-            (TokenType::ELSE, "else"),
-            (TokenType::LBRACE, "{"),
-            (TokenType::RETURN, "return"),
-            (TokenType::FALSE, "false"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::RBRACE, "}"),
-            (TokenType::INT, "10"),
+            (TokenType::Int, "10"),
+            (TokenType::RParen, ")"),
+            (TokenType::LBrace, "{"),
+            (TokenType::Return, "return"),
+            (TokenType::True, "true"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::RBrace, "}"),
+            (TokenType::Else, "else"),
+            (TokenType::LBrace, "{"),
+            (TokenType::Return, "return"),
+            (TokenType::False, "false"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::RBrace, "}"),
+            (TokenType::Int, "10"),
             (TokenType::EQ, "=="),
-            (TokenType::INT, "10"),
-            (TokenType::SEMICOLON, ";"),
-            (TokenType::INT, "10"),
-            (TokenType::NOTEQ, "!="),
-            (TokenType::INT, "9"),
-            (TokenType::SEMICOLON, ";"),
+            (TokenType::Int, "10"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Int, "10"),
+            (TokenType::NotEQ, "!="),
+            (TokenType::Int, "9"),
+            (TokenType::Semicolon, ";"),
             (TokenType::EOF, ""),
         ];
 

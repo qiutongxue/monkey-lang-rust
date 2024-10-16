@@ -16,7 +16,7 @@ const PROMPT: &str = ">> ";
 
 use std::io::{self, Write};
 
-use crate::{evaluator, lexer, parser};
+use crate::{ast::NodeEnum, evaluator, lexer, parser};
 
 pub fn start(stdin: io::Stdin) {
     println!("{MONKEY_FACE}");
@@ -40,7 +40,7 @@ pub fn start(stdin: io::Stdin) {
                 continue;
             }
 
-            let evaluated = evaluator::eval(Box::new(program));
+            let evaluated = evaluator::eval(NodeEnum::Program(program));
 
             if let Some(e) = evaluated {
                 println!("{}", e.inspect());

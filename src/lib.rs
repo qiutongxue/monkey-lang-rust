@@ -25,3 +25,29 @@ macro_rules! impl_as_any {
         )*
     };
 }
+
+#[macro_export]
+macro_rules! impl_node_for_enum {
+    ($enum_name:ident {$($variant:ident),* }) => {
+        impl ToString for $enum_name {
+            fn to_string(&self) -> String {
+                match self {
+                    $(
+                        $enum_name::$variant(v) => v.to_string(),
+                    )*
+                }
+            }
+        }
+
+        impl Node for $enum_name {
+            fn token_literal(&self) -> String {
+                match self {
+                    $(
+                        $enum_name::$variant(v) => v.token_literal(),
+                    )*
+                }
+            }
+        }
+
+    };
+}
