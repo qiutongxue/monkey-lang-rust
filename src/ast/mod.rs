@@ -39,14 +39,14 @@ impl_node_for_enum!(NodeEnum {
     ExpressionEnum
 });
 
-pub(crate) trait Node: ToString {
+pub trait Node: ToString {
     fn token_literal(&self) -> String;
 }
 
 /// 语法树的根节点
 #[derive(Debug)]
 pub struct Program {
-    pub(crate) statements: Vec<StatementEnum>,
+    pub statements: Vec<StatementEnum>,
 }
 
 impl ToString for Program {

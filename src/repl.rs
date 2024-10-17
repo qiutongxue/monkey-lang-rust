@@ -14,17 +14,15 @@ const MONKEY_FACE: &str = r#"
 
 const PROMPT: &str = ">> ";
 
-use std::io::{self, Write};
+use std::io::Write;
 
-use crate::{ast::NodeEnum, evaluator, lexer, parser};
+use crate::{ast::NodeEnum, evaluator, lexer, object::Environment, parser};
 
-pub fn start(stdin: io::Stdin) {
+pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
     println!("{MONKEY_FACE}");
+    let mut env = Environment::new();
 
     loop {
-        // print!("{}", PROMPT);
-        let mut out = io::stdout();
-        // let mut out = out.lock();
         out.write_all(PROMPT.as_bytes()).unwrap();
         out.flush().unwrap();
 
@@ -40,11 +38,10 @@ pub fn start(stdin: io::Stdin) {
                 continue;
             }
 
-            let evaluated = evaluator::eval(NodeEnum::Program(program));
+            let evaluated =
+                evaluator::eval(NodeEnum::Program(program), &mut env).unwrap_or_else(|e| e.into());
 
-            if let Some(e) = evaluated {
-                println!("{}", e.inspect());
-            }
+            println!("{}", evaluated.inspect());
 
             // println!("{}", program.to_string());
         }
