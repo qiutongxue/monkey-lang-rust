@@ -3,7 +3,7 @@ use crate::{ast::Node, token::Token};
 use super::Expression;
 
 /// <identifier> 标识符
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Identifier {
     pub token: Token,
     pub value: String,

@@ -8,7 +8,7 @@ use super::Statement;
 /// return 语句
 ///
 /// return <expression>;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ReturnStatement {
     pub(crate) token: Token, // token::RETURN
     pub(crate) return_value: Option<ExpressionEnum>,

@@ -5,7 +5,7 @@ use super::Expression;
 /// 布尔表达式
 ///
 /// true false
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Boolean {
     pub token: Token, // token::TRUE or token::FALSE
     pub value: bool,

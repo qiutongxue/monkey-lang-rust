@@ -2,7 +2,7 @@ use crate::{
     ast::{
         BlockStatement, ExpressionEnum, Identifier, IfExpression, NodeEnum, Program, StatementEnum,
     },
-    object::{Environment, Object},
+    object::{Environment, Function, Object, RcEnvironment},
 };
 
 const TRUE: Object = Object::Boolean(true);
@@ -16,6 +16,7 @@ pub enum EvalError {
     UnexpectedError,
     MissingExpression,          // 缺少表达式
     IdentifierNotFound(String), // 未找到标识符
+    NotAFunction(String),       // 不是函数
 }
 
 impl From<EvalError> for Object {
@@ -26,21 +27,24 @@ impl From<EvalError> for Object {
             EvalError::IdentifierNotFound(ident) => {
                 Object::Error(format!("identifier not found: {}", ident))
             }
+
             EvalError::UnexpectedError => Object::Error("unexpected error".to_string()),
             EvalError::MissingExpression => Object::Error("missing expression".to_string()),
+            EvalError::NotAFunction(msg) => Object::Error(format!("not a function: {}", msg)),
         }
     }
 }
 
-pub(crate) fn eval(node: NodeEnum, env: &mut Environment) -> Result<Object, EvalError> {
-    match node {
+pub(crate) fn eval(node: NodeEnum, env: RcEnvironment) -> Object {
+    (match node {
         NodeEnum::Program(p) => eval_programe(&p, env),
         NodeEnum::StatementEnum(s) => eval_statement(&s, env),
         NodeEnum::ExpressionEnum(e) => eval_expression(&e, env),
-    }
+    })
+    .unwrap_or_else(|error| error.into())
 }
 
-fn eval_statement(stmt: &StatementEnum, env: &mut Environment) -> Result<Object, EvalError> {
+fn eval_statement(stmt: &StatementEnum, env: RcEnvironment) -> Result<Object, EvalError> {
     match stmt {
         StatementEnum::ExpressionStatement(s) => eval_expression(
             s.expression.as_ref().ok_or(EvalError::MissingExpression)?,
@@ -59,16 +63,16 @@ fn eval_statement(stmt: &StatementEnum, env: &mut Environment) -> Result<Object,
             let value = s
                 .value
                 .as_ref()
-                .map(|v| eval_expression(v, env))
+                .map(|v| eval_expression(v, env.clone()))
                 .transpose()?
                 .unwrap_or(NULL);
-            env.set(s.name.value.to_owned(), value.clone());
-            Ok(value)
+            env.borrow_mut().set(s.name.value.to_owned(), value);
+            Ok(NULL)
         }
     }
 }
 
-fn eval_expression(exp: &ExpressionEnum, env: &mut Environment) -> Result<Object, EvalError> {
+fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, EvalError> {
     match exp {
         ExpressionEnum::IntegerLiteral(il) => Ok(Object::Integer(il.value)),
         ExpressionEnum::Boolean(b) => Ok(native_bool_to_boolean_object(b.value)),
@@ -78,21 +82,66 @@ fn eval_expression(exp: &ExpressionEnum, env: &mut Environment) -> Result<Object
             eval_prefix_expression(pe.operator.as_str(), right)
         }
         ExpressionEnum::InfixExpression(ie) => {
-            let left = eval_expression(ie.left.as_ref().ok_or(EvalError::MissingExpression)?, env)?;
+            let left = eval_expression(
+                ie.left.as_ref().ok_or(EvalError::MissingExpression)?,
+                env.clone(),
+            )?;
             let right =
                 eval_expression(ie.right.as_ref().ok_or(EvalError::MissingExpression)?, env)?;
             eval_infix_expression(ie.operator.as_str(), left, right)
         }
         ExpressionEnum::IfExpression(ie) => eval_if_expression(ie, env),
         ExpressionEnum::Identifier(ident) => eval_identifier(ident, env),
-        _ => Ok(NULL),
+        ExpressionEnum::FunctionLiteral(func) => {
+            let parameters = func.parameters.clone();
+            let body = func.body.clone();
+            Ok(Object::Function(Function {
+                parameters,
+                body,
+                env,
+            }))
+        }
+        ExpressionEnum::CallExpression(ce) => {
+            let function = eval_expression(&ce.function, env.clone())?;
+            let args = eval_expressions(&ce.arguments, env)?;
+            apply_function(&function, args)
+        }
+        ExpressionEnum::BlockStatement(bs) => eval_block_statement(bs, env),
     }
 }
 
-fn eval_programe(program: &Program, env: &mut Environment) -> Result<Object, EvalError> {
+fn eval_expressions(exps: &[ExpressionEnum], env: RcEnvironment) -> Result<Vec<Object>, EvalError> {
+    let mut result = Vec::with_capacity(exps.len());
+    for exp in exps {
+        let evaluated = eval_expression(exp, env.clone())?;
+        result.push(evaluated);
+    }
+    Ok(result)
+}
+
+fn apply_function(func: &Object, args: Vec<Object>) -> Result<Object, EvalError> {
+    if let Object::Function(f) = func {
+        let new_env = extend_function_env(f, args);
+        let evaluated = eval_block_statement(&f.body, new_env)?.unwrap_return_value();
+        Ok(evaluated)
+    } else {
+        Err(EvalError::NotAFunction(func.get_type().to_string()))
+    }
+}
+
+/// 为函数创建新环境
+fn extend_function_env(f: &Function, args: Vec<Object>) -> RcEnvironment {
+    let mut new_env = Environment::new_enclosed(f.env.clone());
+    for (param, arg) in f.parameters.iter().zip(args) {
+        new_env.set(param.value.to_string(), arg);
+    }
+    new_env.to_rc()
+}
+
+fn eval_programe(program: &Program, env: RcEnvironment) -> Result<Object, EvalError> {
     let mut result = NULL;
     for stmt in &program.statements {
-        result = eval_statement(stmt, env)?;
+        result = eval_statement(stmt, env.clone())?;
         if let Object::ReturnValue(rv) = result {
             return Ok(*rv);
         }
@@ -100,13 +149,10 @@ fn eval_programe(program: &Program, env: &mut Environment) -> Result<Object, Eva
     Ok(result)
 }
 
-fn eval_block_statement(
-    block: &BlockStatement,
-    env: &mut Environment,
-) -> Result<Object, EvalError> {
+fn eval_block_statement(block: &BlockStatement, env: RcEnvironment) -> Result<Object, EvalError> {
     let mut result = NULL;
     for stmt in &block.statements {
-        result = eval_statement(stmt, env)?;
+        result = eval_statement(stmt, env.clone())?;
         // 这里不解构 rv，因为可能会有嵌套 return 的情况
         // 即遇到第一个return 之后，后续的语句都不执行
         if matches!(result, Object::ReturnValue(_)) {
@@ -116,9 +162,9 @@ fn eval_block_statement(
     return Ok(result);
 }
 
-fn eval_identifier(ident: &Identifier, env: &mut Environment) -> Result<Object, EvalError> {
-    env.get(&ident.value)
-        .cloned()
+fn eval_identifier(ident: &Identifier, env: RcEnvironment) -> Result<Object, EvalError> {
+    env.borrow()
+        .get(&ident.value)
         .ok_or(EvalError::IdentifierNotFound(ident.value.to_string()))
 }
 
@@ -191,16 +237,16 @@ fn eval_minus_prefix_operator_expression(right: Object) -> Result<Object, EvalEr
     }
 }
 
-fn eval_if_expression(ie: &IfExpression, env: &mut Environment) -> Result<Object, EvalError> {
+fn eval_if_expression(ie: &IfExpression, env: RcEnvironment) -> Result<Object, EvalError> {
     let condition = eval_expression(
         ie.condition.as_ref().ok_or(EvalError::UnexpectedError)?,
-        env,
+        env.clone(),
     )?;
 
     if condition.is_truthy() {
         eval_block_statement(
             ie.consequence.as_ref().ok_or(EvalError::UnexpectedError)?,
-            env,
+            env.clone(),
         )
     } else if ie.alternative.is_some() {
         eval_block_statement(
@@ -235,9 +281,9 @@ mod test {
         let l = Lexer::new(input.to_string());
         let mut p = Parser::new(l);
         let program = p.parse_program().unwrap();
-        let mut env = Environment::new();
+        let env = Environment::new().to_rc();
 
-        return eval(NodeEnum::Program(program), &mut env).unwrap_or_else(|e| e.into());
+        return eval(NodeEnum::Program(program), env);
     }
 
     #[test]
@@ -441,5 +487,68 @@ mod test {
             let evaluated = test_eval(input);
             test_integer_object(&evaluated, expected);
         }
+    }
+
+    #[test]
+    fn test_function_object() {
+        let input = "fn(x) { x + 2; }";
+        let evaluated = test_eval(input);
+        if let Object::Function(func) = evaluated {
+            assert_eq!(
+                func.parameters.len(),
+                1,
+                "function has wrong parameters. Parameters: {}",
+                func.parameters.len()
+            );
+
+            assert_eq!(
+                func.parameters[0].to_string(),
+                "x",
+                "function has wrong parameter names. Parameters: {:?}",
+                func.parameters
+            );
+
+            let expected_body = "(x + 2)";
+
+            assert_eq!(
+                func.body.to_string(),
+                expected_body,
+                "function has wrong body. Body: {}",
+                func.body.to_string()
+            );
+        } else {
+            panic!("object is not Function");
+        }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let tests = [
+            ("let identity = fn(x) { x; }; identity(5);", 5),
+            ("let identity = fn(x) { return x; }; identity(5);", 5),
+            ("let double = fn(x) { x * 2; }; double(5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            test_integer_object(&evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_closures() {
+        let input = r#"
+            let x = 10;
+            let y = 20;
+            let newAdder = fn(x) { 
+                fn(y) { x + y } 
+            }; 
+            let addTwo = newAdder(2); 
+            addTwo(3);
+            "#;
+        let evaluated = test_eval(input);
+        test_integer_object(&evaluated, 5);
     }
 }

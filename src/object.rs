@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+use crate::ast::{BlockStatement, Identifier};
 
 #[derive(Debug, Clone)]
 pub enum Object {
@@ -7,6 +9,7 @@ pub enum Object {
     Null,
     ReturnValue(Box<Object>),
     Error(String),
+    Function(Function),
 }
 
 impl Object {
@@ -17,6 +20,18 @@ impl Object {
             Object::Null => "null".to_string(),
             Object::ReturnValue(v) => v.inspect(),
             Object::Error(v) => format!("ERROR: {v}"),
+            Object::Function(func) => {
+                let mut params = Vec::with_capacity(func.parameters.len());
+                for param in &func.parameters {
+                    params.push(param.value.clone());
+                }
+
+                format!(
+                    "fn({}) {{\n{} \n}}",
+                    params.join(", "),
+                    func.body.to_string()
+                )
+            }
         }
     }
 
@@ -27,6 +42,7 @@ impl Object {
             Object::Null => false,
             Object::ReturnValue(v) => v.is_truthy(),
             Object::Error(_) => unreachable!(),
+            Object::Function(_) => true,
         }
     }
 
@@ -37,18 +53,38 @@ impl Object {
             Object::Null => "NULL",
             Object::ReturnValue(_) => "RETURN_VALUE",
             Object::Error(_) => "ERROR",
+            Object::Function(_) => "FUNCTION",
+        }
+    }
+
+    pub fn unwrap_return_value(self) -> Object {
+        match self {
+            Object::ReturnValue(v) => *v,
+            obj => obj,
         }
     }
 }
 
+pub type RcEnvironment = Rc<RefCell<Environment>>;
+
+#[derive(Debug)]
 pub struct Environment {
     store: HashMap<String, Object>,
+    outer: Option<RcEnvironment>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         Self {
             store: HashMap::new(),
+            outer: None,
+        }
+    }
+
+    pub fn new_enclosed(outer: RcEnvironment) -> Self {
+        Self {
+            store: HashMap::new(),
+            outer: Some(outer),
         }
     }
 
@@ -56,7 +92,24 @@ impl Environment {
         self.store.insert(name, value);
     }
 
-    pub fn get(&self, name: &str) -> Option<&Object> {
-        self.store.get(name)
+    pub fn get(&self, name: &str) -> Option<Object> {
+        if let Some(result) = self.store.get(name) {
+            return Some(result.clone());
+        }
+        if let Some(outer) = &self.outer {
+            return outer.borrow().get(name);
+        }
+        None
     }
+
+    pub fn to_rc(self) -> RcEnvironment {
+        Rc::new(RefCell::new(self))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
+    pub env: RcEnvironment,
 }

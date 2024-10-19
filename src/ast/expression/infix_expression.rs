@@ -7,7 +7,7 @@ use super::{Expression, ExpressionEnum};
 /// <left expression> <infix operator> <right expression>
 ///
 /// 5 + 5
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InfixExpression {
     pub token: Token, // 中缀操作符，比如 +
     pub left: Option<Box<ExpressionEnum>>,

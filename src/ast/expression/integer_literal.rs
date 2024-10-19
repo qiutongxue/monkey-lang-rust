@@ -4,7 +4,7 @@ use super::Expression;
 
 /// 整型字面量表达式
 /// 5 10 23 ...
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntegerLiteral {
     pub token: Token, // token::INT
     pub value: i64,

@@ -6,7 +6,7 @@ use super::Statement;
 
 /// 表达式语句
 /// <expression>;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExpressionStatement {
     pub(crate) token: Token, // 语句的第一个 token
     pub(crate) expression: Option<ExpressionEnum>,

@@ -11,7 +11,7 @@ use super::Statement;
 /// let 语句
 ///
 /// let <identifier> = <expression>;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetStatement {
     pub(crate) token: Token, // token::LET
     pub(crate) name: Identifier,

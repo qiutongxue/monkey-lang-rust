@@ -5,7 +5,7 @@ use super::{block_statement::BlockStatement, Expression, Identifier};
 /// 函数表达式
 ///
 /// fn (<parameters>) <block statement>
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionLiteral {
     pub token: Token, // token::FUNCTION
     pub parameters: Vec<Identifier>,

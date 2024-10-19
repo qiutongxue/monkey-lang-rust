@@ -8,7 +8,7 @@ use super::Expression;
 /// 块表达式
 ///
 /// { <statement 1> <statement 2> ... }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BlockStatement {
     pub token: Token, // token::LBRACE
     pub statements: Vec<StatementEnum>,
@@ -26,11 +26,9 @@ impl ToString for BlockStatement {
     fn to_string(&self) -> String {
         let mut out = String::new();
 
-        out.push_str("{ ");
         for statement in &self.statements {
             out.push_str(&statement.to_string());
         }
-        out.push_str(" }");
 
         out
     }

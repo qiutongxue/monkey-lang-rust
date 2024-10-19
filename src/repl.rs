@@ -20,7 +20,7 @@ use crate::{ast::NodeEnum, evaluator, lexer, object::Environment, parser};
 
 pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
     println!("{MONKEY_FACE}");
-    let mut env = Environment::new();
+    let env = Environment::new().to_rc();
 
     loop {
         out.write_all(PROMPT.as_bytes()).unwrap();
@@ -38,12 +38,9 @@ pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
                 continue;
             }
 
-            let evaluated =
-                evaluator::eval(NodeEnum::Program(program), &mut env).unwrap_or_else(|e| e.into());
+            let evaluated = evaluator::eval(NodeEnum::Program(program), env.clone());
 
-            println!("{}", evaluated.inspect());
-
-            // println!("{}", program.to_string());
+            println!("{}", evaluated.inspect()); // println!("{}", program.to_string());
         }
     }
 }

@@ -25,7 +25,7 @@ use super::Node;
 /// 会产生值
 pub trait Expression: Node + std::fmt::Debug {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExpressionEnum {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),

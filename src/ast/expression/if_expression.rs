@@ -5,7 +5,7 @@ use super::{block_statement::BlockStatement, Expression, ExpressionEnum};
 /// if 表达式 (注意，if 是表达式，可以返回值的，如 if (x > y) {x} else {y})
 ///
 /// if (<condition>) <consequence> else <alternative>
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct IfExpression {
     pub token: Token, // token::IF
