@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{ast::Node, token::Token};
 
 use super::{Expression, ExpressionEnum};
@@ -22,22 +24,12 @@ impl Node for CallExpression {
     }
 }
 
-impl ToString for CallExpression {
-    fn to_string(&self) -> String {
-        let mut out = String::new();
-
-        let mut args = Vec::new();
+impl Display for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut args = Vec::with_capacity(self.arguments.len());
         for arg in &self.arguments {
             args.push(arg.to_string());
         }
-
-        out.push_str(&self.function.to_string()); // <expression>
-        out.push('('); // (
-
-        out.push_str(&args.join(", ")); // <comma separated expressions>
-
-        out.push(')'); // )
-
-        out
+        write!(f, "{}({})", self.function, args.join(", "))
     }
 }

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{ast::Node, token::Token};
 
 use super::{block_statement::BlockStatement, Expression, ExpressionEnum};
@@ -22,25 +24,17 @@ impl Node for IfExpression {
     }
 }
 
-impl ToString for IfExpression {
-    fn to_string(&self) -> String {
-        let mut out = String::new();
-
-        out.push_str("if"); // if
-        out.push(' '); //
-
-        out.push('('); // (
-        out.push_str(&self.condition.as_ref().unwrap().to_string()); // <condition>
-        out.push(')'); // )
-
-        out.push(' '); //
-        out.push_str(&self.consequence.as_ref().unwrap().to_string()); // <consequence>
-
+impl Display for IfExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "if ({}) {}",
+            self.condition.as_ref().unwrap(),
+            self.consequence.as_ref().unwrap()
+        )?;
         if self.alternative.is_some() {
-            out.push_str(" else "); // else
-            out.push_str(&self.alternative.as_ref().unwrap().to_string()); // <alternative>
+            write!(f, " else {}", self.alternative.as_ref().unwrap())?;
         }
-
-        out
+        Ok(())
     }
 }

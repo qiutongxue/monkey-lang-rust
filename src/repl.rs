@@ -33,7 +33,7 @@ pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
         let mut parser = parser::Parser::new(lexer);
 
         if let Ok(program) = parser.parse_program() {
-            if parser.errors().len() > 0 {
+            if !parser.errors().is_empty() {
                 print_parse_errors(parser.errors());
                 continue;
             }

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{ast::Node, token::Token};
 
 use super::{Expression, ExpressionEnum};
@@ -23,21 +25,14 @@ impl Node for InfixExpression {
     }
 }
 
-impl ToString for InfixExpression {
-    fn to_string(&self) -> String {
-        let mut out = String::new();
-
-        // 为了区分优先级，使用括号包裹
-        out.push('('); // (
-        out.push_str(&self.left.as_ref().unwrap().to_string()); // <left expression>
-
-        out.push(' '); //
-        out.push_str(&self.operator); // <infix operator>
-        out.push(' '); //
-
-        out.push_str(&self.right.as_ref().unwrap().to_string()); // <right expression>
-        out.push(')'); // )
-
-        out
+impl Display for InfixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "({} {} {})",
+            self.left.as_ref().unwrap(),
+            self.operator,
+            self.right.as_ref().unwrap()
+        )
     }
 }

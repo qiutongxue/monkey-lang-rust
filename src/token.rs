@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Token {
     pub token_type: TokenType,
@@ -69,9 +71,9 @@ pub enum TokenType {
     Return,
 }
 
-impl ToString for TokenType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
             TokenType::Illegal => "ILLEGAL",
             TokenType::EOF => "EOF",
             TokenType::Identifier => "IDENT",
@@ -99,8 +101,8 @@ impl ToString for TokenType {
             TokenType::If => "IF",
             TokenType::Else => "ELSE",
             TokenType::Return => "RETURN",
-        }
-        .to_string()
+        };
+        f.write_str(s)
     }
 }
 

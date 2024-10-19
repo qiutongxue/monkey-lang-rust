@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{ast::Node, token::Token};
 
 use super::{block_statement::BlockStatement, Expression, Identifier};
@@ -20,25 +22,19 @@ impl Node for FunctionLiteral {
     }
 }
 
-impl ToString for FunctionLiteral {
-    fn to_string(&self) -> String {
-        let mut out = String::new();
-
-        let mut params = Vec::new();
+impl Display for FunctionLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut params = Vec::with_capacity(self.parameters.len());
         for param in &self.parameters {
             params.push(param.to_string());
         }
 
-        out.push_str(&self.token_literal()); // fn
-        out.push('('); // (
-
-        out.push_str(&params.join(", ")); // <parameters>
-
-        out.push(')'); // )
-        out.push(' '); //
-
-        out.push_str(&self.body.to_string()); // <block statement>
-
-        out
+        write!(
+            f,
+            "{}({}) {}",
+            self.token.literal,
+            params.join(", "),
+            self.body
+        )
     }
 }

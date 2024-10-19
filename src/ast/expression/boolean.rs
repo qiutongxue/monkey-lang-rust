@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{ast::Node, token::Token};
 
 use super::Expression;
@@ -19,8 +21,8 @@ impl Node for Boolean {
     }
 }
 
-impl ToString for Boolean {
-    fn to_string(&self) -> String {
-        self.token.literal.clone()
+impl Display for Boolean {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
     }
 }

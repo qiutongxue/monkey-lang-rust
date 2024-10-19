@@ -26,11 +26,7 @@ impl Object {
                     params.push(param.value.clone());
                 }
 
-                format!(
-                    "fn({}) {{\n{} \n}}",
-                    params.join(", "),
-                    func.body.to_string()
-                )
+                format!("fn({}) {{\n{} \n}}", params.join(", "), func.body)
             }
         }
     }
@@ -104,6 +100,12 @@ impl Environment {
 
     pub fn to_rc(self) -> RcEnvironment {
         Rc::new(RefCell::new(self))
+    }
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

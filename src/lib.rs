@@ -29,11 +29,11 @@ macro_rules! impl_as_any {
 #[macro_export]
 macro_rules! impl_node_for_enum {
     ($enum_name:ident {$($variant:ident),* }) => {
-        impl ToString for $enum_name {
-            fn to_string(&self) -> String {
+        impl std::fmt::Display for $enum_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self {
                     $(
-                        $enum_name::$variant(v) => v.to_string(),
+                        $enum_name::$variant(v) => write!(f, "{}", v),
                     )*
                 }
             }

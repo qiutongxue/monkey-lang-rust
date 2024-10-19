@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::ast::expression::ExpressionEnum;
 use crate::ast::Node;
 use crate::token::Token;
@@ -20,11 +22,11 @@ impl Node for ExpressionStatement {
     }
 }
 
-impl ToString for ExpressionStatement {
-    fn to_string(&self) -> String {
+impl Display for ExpressionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.expression.as_ref() {
-            Some(e) => e.to_string(),
-            None => String::default(),
+            Some(e) => write!(f, "{}", e),
+            _ => Ok(()),
         }
     }
 }

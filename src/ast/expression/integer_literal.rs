@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{ast::Node, token::Token};
 
 use super::Expression;
@@ -18,8 +20,8 @@ impl Node for IntegerLiteral {
     }
 }
 
-impl ToString for IntegerLiteral {
-    fn to_string(&self) -> String {
-        self.token.literal.clone()
+impl Display for IntegerLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
     }
 }

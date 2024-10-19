@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     ast::{expression::ExpressionEnum, Node},
     token::Token,
@@ -22,17 +24,16 @@ impl Node for ReturnStatement {
     }
 }
 
-impl ToString for ReturnStatement {
-    fn to_string(&self) -> String {
-        let mut out = String::new();
-
-        out.push_str(&(self.token_literal() + " ")); // return
-
-        if self.return_value.is_some() {
-            out.push_str(&self.return_value.as_ref().unwrap().to_string()); // <expression>
-        }
-
-        out.push_str(";"); // ;
-        out
+impl Display for ReturnStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{};",
+            self.token.literal,
+            self.return_value
+                .as_ref()
+                .map(|v| format!(" {}", v))
+                .unwrap_or_default()
+        )
     }
 }

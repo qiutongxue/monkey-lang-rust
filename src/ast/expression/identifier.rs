@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{ast::Node, token::Token};
 
 use super::Expression;
@@ -17,8 +19,8 @@ impl Node for Identifier {
     }
 }
 
-impl ToString for Identifier {
-    fn to_string(&self) -> String {
-        self.value.clone()
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }

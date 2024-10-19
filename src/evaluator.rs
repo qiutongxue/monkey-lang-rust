@@ -159,7 +159,7 @@ fn eval_block_statement(block: &BlockStatement, env: RcEnvironment) -> Result<Ob
             return Ok(result);
         }
     }
-    return Ok(result);
+    Ok(result)
 }
 
 fn eval_identifier(ident: &Identifier, env: RcEnvironment) -> Result<Object, EvalError> {
@@ -181,14 +181,12 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Result<
                 operator,
             ))),
         },
-        _ => {
-            return Err(EvalError::TypeMismatch(format!(
-                "{} {} {}",
-                left.get_type(),
-                operator,
-                right.get_type()
-            )))
-        }
+        _ => Err(EvalError::TypeMismatch(format!(
+            "{} {} {}",
+            left.get_type(),
+            operator,
+            right.get_type()
+        ))),
     }
 }
 

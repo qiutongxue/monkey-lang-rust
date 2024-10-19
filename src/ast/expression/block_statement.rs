@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     ast::{Node, StatementEnum},
     token::Token,
@@ -22,14 +24,11 @@ impl Node for BlockStatement {
     }
 }
 
-impl ToString for BlockStatement {
-    fn to_string(&self) -> String {
-        let mut out = String::new();
-
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for statement in &self.statements {
-            out.push_str(&statement.to_string());
+            write!(f, "{}", statement)?;
         }
-
-        out
+        Ok(())
     }
 }

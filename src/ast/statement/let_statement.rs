@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     ast::{
         expression::{ExpressionEnum, Identifier},
@@ -26,19 +28,18 @@ impl Node for LetStatement {
     }
 }
 
-impl ToString for LetStatement {
-    fn to_string(&self) -> String {
-        let mut out = String::new();
-
-        out.push_str(&(self.token_literal() + " ")); // let
-        out.push_str(&self.name.to_string()); // <identifier>
-        out.push_str(" = "); // =
-
-        if self.value.is_some() {
-            out.push_str(&self.value.as_ref().unwrap().to_string()); // <expression>
-        }
-
-        out.push_str(";"); // ;
-        out
+impl Display for LetStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} = {};",
+            self.token.literal,
+            self.name,
+            &self
+                .value
+                .as_ref()
+                .map(|v| v.to_string())
+                .unwrap_or_default()
+        )
     }
 }
