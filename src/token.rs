@@ -50,6 +50,7 @@ pub enum TokenType {
     // 标识符 + 各种字面量类型
     Identifier, // 标识符
     Int,        // 整型
+    String,     // 字符串
 
     // 操作符
     Assign,
@@ -114,6 +115,7 @@ impl Display for TokenType {
             TokenType::If => "IF",
             TokenType::Else => "ELSE",
             TokenType::Return => "RETURN",
+            TokenType::String => "STRING",
         };
         f.write_str(s)
     }

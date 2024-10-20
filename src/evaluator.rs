@@ -107,6 +107,7 @@ fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, E
             apply_function(&function, args)
         }
         ExpressionEnum::BlockStatement(bs) => eval_block_statement(bs, env),
+        ExpressionEnum::StringLiteral(sl) => Ok(Object::String(sl.value.to_owned())),
     }
 }
 
@@ -178,6 +179,13 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Result<
             "!=" => Ok(native_bool_to_boolean_object(left_value != right_value)),
             _ => Err(EvalError::UnknownOperator(format!(
                 "BOOLEAN {} BOOLEAN",
+                operator,
+            ))),
+        },
+        (Object::String(left_value), Object::String(right_value)) => match operator {
+            "+" => Ok(Object::String(left_value.to_owned() + right_value)),
+            _ => Err(EvalError::UnknownOperator(format!(
+                "STRING {} STRING",
                 operator,
             ))),
         },
@@ -456,6 +464,7 @@ mod test {
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
             ("foobar", "identifier not found: foobar"),
+            (r#""Hello" - "World""#, "unknown operator: STRING - STRING"),
         ];
 
         for (input, expected) in tests {
@@ -548,5 +557,41 @@ mod test {
             "#;
         let evaluated = test_eval(input);
         test_integer_object(&evaluated, 5);
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = r#""hello world""#;
+        let evaluated = test_eval(input);
+        if let Object::String(s) = evaluated {
+            assert_eq!(
+                s, "hello world",
+                "string has wrong value. got={}, want={}",
+                s, "hello world"
+            );
+        } else {
+            panic!("object is not String");
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let tests = [
+            (r#""hello" + " " + "world""#, "hello world"),
+            (r#""hello" + " " + "world" + "!""#, "hello world!"),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Object::String(s) = evaluated {
+                assert_eq!(
+                    s, expected,
+                    "string has wrong value. got={}, want={}",
+                    s, expected
+                );
+            } else {
+                panic!("object is not String, got={:?}", evaluated);
+            }
+        }
     }
 }

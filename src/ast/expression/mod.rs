@@ -7,6 +7,7 @@ mod if_expression;
 mod infix_expression;
 mod integer_literal;
 mod prefix_expression;
+mod string_literal;
 
 use crate::impl_node_for_enum;
 pub use block_statement::BlockStatement;
@@ -18,6 +19,7 @@ pub use if_expression::IfExpression;
 pub use infix_expression::InfixExpression;
 pub use integer_literal::IntegerLiteral;
 pub use prefix_expression::PrefixExpression;
+pub use string_literal::StringLiteral;
 
 use super::Node;
 
@@ -36,6 +38,7 @@ pub enum ExpressionEnum {
     CallExpression(CallExpression),
     IfExpression(IfExpression),
     BlockStatement(BlockStatement),
+    StringLiteral(StringLiteral),
 }
 
 impl_node_for_enum!(ExpressionEnum {
@@ -47,5 +50,6 @@ impl_node_for_enum!(ExpressionEnum {
     FunctionLiteral,
     CallExpression,
     IfExpression,
-    BlockStatement
+    BlockStatement,
+    StringLiteral
 });

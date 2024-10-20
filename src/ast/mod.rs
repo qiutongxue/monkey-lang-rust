@@ -5,7 +5,7 @@ use std::fmt::Display;
 
 pub use expression::{
     BlockStatement, Boolean, CallExpression, Expression, ExpressionEnum, FunctionLiteral,
-    Identifier, IfExpression, InfixExpression, IntegerLiteral, PrefixExpression,
+    Identifier, IfExpression, InfixExpression, IntegerLiteral, PrefixExpression, StringLiteral,
 };
 pub use statement::{ExpressionStatement, LetStatement, ReturnStatement, Statement, StatementEnum};
 

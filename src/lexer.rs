@@ -60,14 +60,19 @@ impl Lexer {
             b'{' => tok = Token::from_char(TokenType::LBrace, self.ch),
             b'}' => tok = Token::from_char(TokenType::RBrace, self.ch),
             0 => tok = Token::from_str(TokenType::EOF, ""),
+            b'0'..=b'9' => {
+                let literal = self.read_number();
+                return Token::from_str(TokenType::Int, &literal);
+            }
+            b'"' => {
+                let literal = self.read_string();
+                tok = Token::from_str(TokenType::String, &literal);
+            }
             _ => {
                 if is_letter(self.ch) {
                     let literal = self.read_identifier();
                     let token_type = Token::lookup_ident(&literal);
                     return Token::from_str(token_type, &literal);
-                } else if self.ch.is_ascii_digit() {
-                    let literal = self.read_number();
-                    return Token::from_str(TokenType::Int, &literal);
                 } else {
                     tok = Token::from_char(TokenType::Illegal, self.ch);
                 }
@@ -105,6 +110,17 @@ impl Lexer {
         self.input[position..self.position].to_string()
     }
 
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+        loop {
+            self.read_char();
+            if self.ch == b'"' || self.ch == 0 {
+                break;
+            }
+        }
+        self.input[position..self.position].to_string()
+    }
+
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
@@ -130,7 +146,7 @@ mod test {
 
     #[test]
     fn test_next_token() {
-        let input = "let five = 5;
+        let input = r#"let five = 5;
         let ten = 10;
         let add = fn(x, y) {
         x + y;
@@ -147,7 +163,9 @@ mod test {
         
         10 == 10;
         10 != 9;
-        ";
+        "foobar"
+        "foo bar"
+        "#;
 
         let tests = [
             (TokenType::Let, "let"),
@@ -223,6 +241,8 @@ mod test {
             (TokenType::NotEQ, "!="),
             (TokenType::Int, "9"),
             (TokenType::Semicolon, ";"),
+            (TokenType::String, "foobar"),
+            (TokenType::String, "foo bar"),
             (TokenType::EOF, ""),
         ];
 

@@ -10,12 +10,14 @@ pub enum Object {
     ReturnValue(Box<Object>),
     Error(String),
     Function(Function),
+    String(String),
 }
 
 impl Object {
     pub fn inspect(&self) -> String {
         match self {
             Object::Integer(v) => v.to_string(),
+            Object::String(s) => s.to_owned(),
             Object::Boolean(v) => v.to_string(),
             Object::Null => "null".to_string(),
             Object::ReturnValue(v) => v.inspect(),
@@ -39,6 +41,7 @@ impl Object {
             Object::ReturnValue(v) => v.is_truthy(),
             Object::Error(_) => unreachable!(),
             Object::Function(_) => true,
+            Object::String(s) => !s.is_empty(),
         }
     }
 
@@ -50,6 +53,7 @@ impl Object {
             Object::ReturnValue(_) => "RETURN_VALUE",
             Object::Error(_) => "ERROR",
             Object::Function(_) => "FUNCTION",
+            Object::String(_) => "STRING",
         }
     }
 

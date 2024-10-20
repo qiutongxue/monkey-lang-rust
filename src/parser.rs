@@ -44,7 +44,7 @@ static PRECEDENCES: LazyLock<HashMap<TokenType, Precedence>> = LazyLock::new(|| 
 use crate::ast::{
     BlockStatement, Boolean, CallExpression, ExpressionEnum, ExpressionStatement, FunctionLiteral,
     Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
-    Program, ReturnStatement, StatementEnum,
+    Program, ReturnStatement, StatementEnum, StringLiteral,
 };
 
 type PrefixParseFn = fn(&mut Parser) -> Result<ExpressionEnum, ParseError>;
@@ -82,6 +82,7 @@ impl Parser {
 
         p.register_prefix(TokenType::Identifier, Self::parse_indentifier);
         p.register_prefix(TokenType::Int, Self::parse_integer_literal);
+        p.register_prefix(TokenType::String, Self::parse_string_literal);
         p.register_prefix(TokenType::True, Self::parse_boolean);
         p.register_prefix(TokenType::False, Self::parse_boolean);
         // 遇到 ! 和 - 时，当作整个前缀表达式 <prefix><expression>
@@ -355,6 +356,15 @@ impl Parser {
                 Err(ParseError::ParseIntegerLiteralError)
             }
         }
+    }
+
+    fn parse_string_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
+        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+
+        Ok(ExpressionEnum::StringLiteral(StringLiteral {
+            value: token.literal.clone(),
+            token,
+        }))
     }
 
     fn parse_boolean(&mut self) -> Result<ExpressionEnum, ParseError> {
@@ -1521,5 +1531,35 @@ mod test {
         }
 
         true
+    }
+
+    #[test]
+    fn test_string_literal_expression() {
+        let input = r#""hello world";"#;
+        let l = Lexer::new(input.to_string());
+        let mut p = Parser::new(l);
+
+        let program = p.parse_program();
+        check_parse_errors(&p);
+
+        assert!(program.is_ok(), "parse_program() returned Error");
+
+        let program = program.unwrap();
+        let stmt = &program.statements[0];
+
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::StringLiteral(string) = exp {
+                assert_eq!(
+                    string.value, "hello world",
+                    "string.value not 'hello world'. got={}",
+                    string.value
+                );
+            } else {
+                panic!("exp is not StringLiteral, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
     }
 }
