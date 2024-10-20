@@ -1,4 +1,17 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::LazyLock};
+
+static KEYWORDS: LazyLock<std::collections::HashMap<&'static str, TokenType>> =
+    LazyLock::new(|| {
+        let mut map = std::collections::HashMap::new();
+        map.insert("fn", TokenType::Function);
+        map.insert("let", TokenType::Let);
+        map.insert("true", TokenType::True);
+        map.insert("false", TokenType::False);
+        map.insert("if", TokenType::If);
+        map.insert("else", TokenType::Else);
+        map.insert("return", TokenType::Return);
+        map
+    });
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Token {
@@ -105,17 +118,3 @@ impl Display for TokenType {
         f.write_str(s)
     }
 }
-
-lazy_static::lazy_static!(
-    pub static ref KEYWORDS: std::collections::HashMap<&'static str, TokenType> = {
-        let mut map = std::collections::HashMap::new();
-        map.insert("fn", TokenType::Function);
-        map.insert("let", TokenType::Let);
-        map.insert("true", TokenType::True);
-        map.insert("false", TokenType::False);
-        map.insert("if", TokenType::If);
-        map.insert("else", TokenType::Else);
-        map.insert("return", TokenType::Return);
-        map
-    };
-);

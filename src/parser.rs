@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-
-use lazy_static::lazy_static;
+use std::sync::LazyLock;
 
 use crate::token::TokenType;
 
@@ -28,21 +27,19 @@ pub enum Precedence {
     Call,        // myFunction(X)
 }
 
-lazy_static! {
-    static ref PRECEDENCES: HashMap<TokenType, Precedence> = {
-        let mut map = HashMap::new();
-        map.insert(TokenType::EQ, Precedence::Equals);
-        map.insert(TokenType::NotEQ, Precedence::Equals);
-        map.insert(TokenType::LT, Precedence::LessGreater);
-        map.insert(TokenType::GT, Precedence::LessGreater);
-        map.insert(TokenType::Plus, Precedence::Sum);
-        map.insert(TokenType::Minus, Precedence::Sum);
-        map.insert(TokenType::Slash, Precedence::Product);
-        map.insert(TokenType::Asterisk, Precedence::Product);
-        map.insert(TokenType::LParen, Precedence::Call);
-        map
-    };
-}
+static PRECEDENCES: LazyLock<HashMap<TokenType, Precedence>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
+    map.insert(TokenType::EQ, Precedence::Equals);
+    map.insert(TokenType::NotEQ, Precedence::Equals);
+    map.insert(TokenType::LT, Precedence::LessGreater);
+    map.insert(TokenType::GT, Precedence::LessGreater);
+    map.insert(TokenType::Plus, Precedence::Sum);
+    map.insert(TokenType::Minus, Precedence::Sum);
+    map.insert(TokenType::Slash, Precedence::Product);
+    map.insert(TokenType::Asterisk, Precedence::Product);
+    map.insert(TokenType::LParen, Precedence::Call);
+    map
+});
 
 use crate::ast::{
     BlockStatement, Boolean, CallExpression, ExpressionEnum, ExpressionStatement, FunctionLiteral,
