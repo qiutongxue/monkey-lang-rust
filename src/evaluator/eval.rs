@@ -12,7 +12,6 @@ pub enum EvalError {
     UnknownOperator(String), // -BOOLEAN, BOOLEAN + BOOLEAN
     TypeMismatch(String),    // BOOLEAN + INTEGER
     UnexpectedError,
-    MissingExpression,          // 缺少表达式
     IdentifierNotFound(String), // 未找到标识符
     NotAFunction(String),       // 不是函数
     IndexError(String),         // 数组索引越界
@@ -28,7 +27,6 @@ impl From<EvalError> for Object {
             }
 
             EvalError::UnexpectedError => Object::Error("unexpected error".to_string()),
-            EvalError::MissingExpression => Object::Error("missing expression".to_string()),
             EvalError::NotAFunction(msg) => Object::Error(format!("not a function: {}", msg)),
             EvalError::IndexError(msg) => Object::Error(format!("index error: {}", msg)),
         }
@@ -46,10 +44,7 @@ pub fn eval(node: NodeEnum, env: RcEnvironment) -> Object {
 
 fn eval_statement(stmt: &StatementEnum, env: RcEnvironment) -> Result<Object, EvalError> {
     match stmt {
-        StatementEnum::ExpressionStatement(s) => eval_expression(
-            s.expression.as_ref().ok_or(EvalError::MissingExpression)?,
-            env,
-        ),
+        StatementEnum::ExpressionStatement(s) => eval_expression(&s.expression, env),
         StatementEnum::ReturnStatement(s) => {
             let value = s
                 .return_value
@@ -77,17 +72,12 @@ fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, E
         ExpressionEnum::IntegerLiteral(il) => Ok(Object::Integer(il.value)),
         ExpressionEnum::Boolean(b) => Ok(native_bool_to_boolean_object(b.value)),
         ExpressionEnum::PrefixExpression(pe) => {
-            let right =
-                eval_expression(pe.right.as_ref().ok_or(EvalError::MissingExpression)?, env)?;
+            let right = eval_expression(pe.right.as_ref(), env)?;
             eval_prefix_expression(pe.operator.as_str(), right)
         }
         ExpressionEnum::InfixExpression(ie) => {
-            let left = eval_expression(
-                ie.left.as_ref().ok_or(EvalError::MissingExpression)?,
-                env.clone(),
-            )?;
-            let right =
-                eval_expression(ie.right.as_ref().ok_or(EvalError::MissingExpression)?, env)?;
+            let left = eval_expression(ie.left.as_ref(), env.clone())?;
+            let right = eval_expression(ie.right.as_ref(), env)?;
             eval_infix_expression(ie.operator.as_str(), left, right)
         }
         ExpressionEnum::IfExpression(ie) => eval_if_expression(ie, env),
@@ -275,16 +265,10 @@ fn eval_minus_prefix_operator_expression(right: Object) -> Result<Object, EvalEr
 }
 
 fn eval_if_expression(ie: &IfExpression, env: RcEnvironment) -> Result<Object, EvalError> {
-    let condition = eval_expression(
-        ie.condition.as_ref().ok_or(EvalError::UnexpectedError)?,
-        env.clone(),
-    )?;
+    let condition = eval_expression(ie.condition.as_ref(), env.clone())?;
 
     if condition.is_truthy() {
-        eval_block_statement(
-            ie.consequence.as_ref().ok_or(EvalError::UnexpectedError)?,
-            env.clone(),
-        )
+        eval_block_statement(&ie.consequence, env.clone())
     } else if ie.alternative.is_some() {
         eval_block_statement(
             ie.alternative.as_ref().ok_or(EvalError::UnexpectedError)?,

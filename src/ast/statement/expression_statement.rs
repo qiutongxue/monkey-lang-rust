@@ -11,7 +11,7 @@ use super::Statement;
 #[derive(Debug, Clone)]
 pub struct ExpressionStatement {
     pub(crate) token: Token, // 语句的第一个 token
-    pub(crate) expression: Option<ExpressionEnum>,
+    pub(crate) expression: ExpressionEnum,
 }
 
 impl Statement for ExpressionStatement {}
@@ -24,9 +24,6 @@ impl Node for ExpressionStatement {
 
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.expression.as_ref() {
-            Some(e) => write!(f, "{}", e),
-            _ => Ok(()),
-        }
+        write!(f, "{}", self.expression)
     }
 }

@@ -12,9 +12,9 @@ use super::{Expression, ExpressionEnum};
 #[derive(Debug, Clone)]
 pub struct InfixExpression {
     pub token: Token, // 中缀操作符，比如 +
-    pub left: Option<Box<ExpressionEnum>>,
+    pub left: Box<ExpressionEnum>,
     pub operator: String,
-    pub right: Option<Box<ExpressionEnum>>,
+    pub right: Box<ExpressionEnum>,
 }
 
 impl Expression for InfixExpression {}
@@ -30,9 +30,9 @@ impl Display for InfixExpression {
         write!(
             f,
             "({} {} {})",
-            self.left.as_ref().unwrap(),
+            self.left.as_ref(),
             self.operator,
-            self.right.as_ref().unwrap()
+            self.right.as_ref()
         )
     }
 }

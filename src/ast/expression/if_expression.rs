@@ -11,8 +11,8 @@ use super::{block_statement::BlockStatement, Expression, ExpressionEnum};
 
 pub struct IfExpression {
     pub token: Token, // token::IF
-    pub condition: Option<Box<ExpressionEnum>>,
-    pub consequence: Option<BlockStatement>,
+    pub condition: Box<ExpressionEnum>,
+    pub consequence: BlockStatement,
     pub alternative: Option<BlockStatement>,
 }
 
@@ -26,12 +26,7 @@ impl Node for IfExpression {
 
 impl Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "if ({}) {}",
-            self.condition.as_ref().unwrap(),
-            self.consequence.as_ref().unwrap()
-        )?;
+        write!(f, "if ({}) {}", self.condition, self.consequence)?;
         if self.alternative.is_some() {
             write!(f, " else {}", self.alternative.as_ref().unwrap())?;
         }

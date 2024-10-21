@@ -52,8 +52,7 @@ use crate::ast::{
 };
 
 type PrefixParseFn = fn(&mut Parser) -> Result<ExpressionEnum, ParseError>;
-type InfixParseFn =
-    fn(&mut Parser, Option<Box<ExpressionEnum>>) -> Result<ExpressionEnum, ParseError>;
+type InfixParseFn = fn(&mut Parser, Box<ExpressionEnum>) -> Result<ExpressionEnum, ParseError>;
 
 use crate::lexer::Lexer;
 use crate::token::Token;
@@ -221,7 +220,7 @@ impl Parser {
     fn parse_expression_statement(&mut self) -> Result<ExpressionStatement, ParseError> {
         let stmt = ExpressionStatement {
             token: self.cur_token.clone(),
-            expression: Some(self.parse_expression(Precedence::Lowest)?),
+            expression: self.parse_expression(Precedence::Lowest)?,
         };
 
         // 表达式结尾可以没有分号（用于 REPL，如敲下 5 + 5 并回车）
@@ -255,7 +254,7 @@ impl Parser {
                         None => return Ok(left_exp),
                         Some(&infix) => {
                             self.next_token();
-                            left_exp = infix(self, Some(Box::new(left_exp)))?;
+                            left_exp = infix(self, Box::new(left_exp))?;
                         }
                     }
                 }
@@ -270,7 +269,7 @@ impl Parser {
 
         self.next_token();
 
-        let right = Some(Box::new(self.parse_expression(Precedence::Prefix)?));
+        let right = Box::new(self.parse_expression(Precedence::Prefix)?);
 
         Ok(ExpressionEnum::PrefixExpression(PrefixExpression {
             operator: token.literal.clone(),
@@ -281,7 +280,7 @@ impl Parser {
 
     fn parse_infix_expression(
         &mut self,
-        left: Option<Box<ExpressionEnum>>,
+        left: Box<ExpressionEnum>,
     ) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone();
 
@@ -289,7 +288,7 @@ impl Parser {
 
         self.next_token();
 
-        let right = Some(Box::new(self.parse_expression(precedence)?));
+        let right = Box::new(self.parse_expression(precedence)?);
 
         Ok(ExpressionEnum::InfixExpression(InfixExpression {
             operator: token.literal.clone(),
@@ -404,7 +403,7 @@ impl Parser {
 
         self.next_token();
 
-        let condition = Some(Box::new(self.parse_expression(Precedence::Lowest)?));
+        let condition = Box::new(self.parse_expression(Precedence::Lowest)?);
 
         if !self.expect_peek(TokenType::RParen) {
             return Err(ParseError::ParseIfExpressionError);
@@ -414,7 +413,7 @@ impl Parser {
             return Err(ParseError::ParseIfExpressionError);
         }
 
-        let consequence = self.parse_block_statement().ok();
+        let consequence = self.parse_block_statement()?;
         let mut alternative = None;
         if self.peek_token_is(TokenType::Else) {
             self.next_token();
@@ -523,7 +522,7 @@ impl Parser {
     /// <expression>(<param1>, <param2>, ...)
     fn parse_call_expression(
         &mut self,
-        function: Option<Box<ExpressionEnum>>,
+        function: Box<ExpressionEnum>,
     ) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone();
 
@@ -531,20 +530,20 @@ impl Parser {
 
         Ok(ExpressionEnum::CallExpression(CallExpression {
             token,
-            function: function.ok_or(ParseError::ParseCallExpressionError)?,
+            function,
             arguments,
         }))
     }
 
     fn parse_index_expression(
         &mut self,
-        left: Option<Box<ExpressionEnum>>,
+        left: Box<ExpressionEnum>,
     ) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone();
 
         self.next_token();
 
-        let index = Some(Box::new(self.parse_expression(Precedence::Lowest)?));
+        let index = Box::new(self.parse_expression(Precedence::Lowest)?);
 
         if !self.expect_peek(TokenType::RBracket) {
             return Err(ParseError::ParseIndexExpressionError);
@@ -552,8 +551,8 @@ impl Parser {
 
         Ok(ExpressionEnum::IndexExpression(IndexExpression {
             token,
-            left: left.ok_or(ParseError::ParseIndexExpressionError)?,
-            index: index.ok_or(ParseError::ParseIndexExpressionError)?,
+            left,
+            index,
         }))
     }
 
@@ -747,7 +746,7 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::Identifier(ident) = exp {
                 assert_eq!(
                     ident.value, "foobar",
@@ -794,7 +793,7 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::IntegerLiteral(lit) = exp {
                 assert_eq!(lit.value, 5, "lit.value not '5', got = {}", lit.value);
 
@@ -844,7 +843,7 @@ mod test {
             let stmt = &program.statements[0];
 
             if let StatementEnum::ExpressionStatement(stmt) = stmt {
-                let exp = stmt.expression.as_ref().unwrap();
+                let exp = &stmt.expression;
                 if let ExpressionEnum::PrefixExpression(exp) = exp {
                     assert_eq!(
                         exp.operator, operator,
@@ -852,10 +851,7 @@ mod test {
                         operator, exp.operator
                     );
 
-                    assert!(_test_literal_expression(
-                        exp.right.as_ref().unwrap().as_ref(),
-                        value
-                    ));
+                    assert!(_test_literal_expression(exp.right.as_ref(), value));
                 } else {
                     panic!("exp is not PrefixExpression, got={:?}", exp);
                 }
@@ -920,7 +916,7 @@ mod test {
 
             if let StatementEnum::ExpressionStatement(exp_stmt) = stmt {
                 assert!(_test_infix_expression(
-                    exp_stmt.expression.as_ref().unwrap(),
+                    &exp_stmt.expression,
                     left_value,
                     operator,
                     right_value,
@@ -1026,7 +1022,7 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::Boolean(boolean) = exp {
                 assert_eq!(
                     boolean.value, true,
@@ -1073,26 +1069,26 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::IfExpression(if_exp) = exp {
                 assert!(_test_infix_expression(
-                    if_exp.condition.as_ref().unwrap().as_ref(),
+                    if_exp.condition.as_ref(),
                     Value::Text("x".to_string()),
                     "<",
                     Value::Text("y".to_string()),
                 ));
 
                 assert_eq!(
-                    if_exp.consequence.as_ref().unwrap().statements.len(),
+                    if_exp.consequence.statements.len(),
                     1,
                     "consequence is not 1 statements, got={}",
-                    if_exp.consequence.as_ref().unwrap().statements.len()
+                    if_exp.consequence.statements.len()
                 );
 
-                let consequence = &if_exp.consequence.as_ref().unwrap().statements[0];
+                let consequence = &if_exp.consequence.statements[0];
 
                 if let StatementEnum::ExpressionStatement(consequence) = consequence {
-                    let consequence_exp = consequence.expression.as_ref().unwrap();
+                    let consequence_exp = &consequence.expression;
                     assert!(_test_identifier(consequence_exp, "x"));
 
                     assert!(
@@ -1139,26 +1135,26 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::IfExpression(if_exp) = exp {
                 assert!(_test_infix_expression(
-                    if_exp.condition.as_ref().unwrap().as_ref(),
+                    if_exp.condition.as_ref(),
                     Value::Text("x".to_string()),
                     "<",
                     Value::Text("y".to_string()),
                 ));
 
                 assert_eq!(
-                    if_exp.consequence.as_ref().unwrap().statements.len(),
+                    if_exp.consequence.statements.len(),
                     1,
                     "consequence is not 1 statements, got={}",
-                    if_exp.consequence.as_ref().unwrap().statements.len()
+                    if_exp.consequence.statements.len()
                 );
 
-                let consequence = &if_exp.consequence.as_ref().unwrap().statements[0];
+                let consequence = &if_exp.consequence.statements[0];
 
                 if let StatementEnum::ExpressionStatement(consequence) = consequence {
-                    let consequence_exp = consequence.expression.as_ref().unwrap();
+                    let consequence_exp = &consequence.expression;
                     assert!(_test_identifier(consequence_exp, "x"));
                 } else {
                     panic!(
@@ -1177,7 +1173,7 @@ mod test {
                 let alternative = &if_exp.alternative.as_ref().unwrap().statements[0];
 
                 if let StatementEnum::ExpressionStatement(alternative) = alternative {
-                    let alternative_exp = alternative.expression.as_ref().unwrap();
+                    let alternative_exp = &alternative.expression;
                     assert!(_test_identifier(alternative_exp, "y"));
                 } else {
                     panic!(
@@ -1218,7 +1214,7 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::FunctionLiteral(function) = exp {
                 assert_eq!(
                     function.parameters.len(),
@@ -1249,7 +1245,7 @@ mod test {
                 let body_stmt = &function.body.statements[0];
 
                 if let StatementEnum::ExpressionStatement(body_stmt) = body_stmt {
-                    let body_exp = body_stmt.expression.as_ref().unwrap();
+                    let body_exp = &body_stmt.expression;
                     assert!(_test_infix_expression(
                         body_exp,
                         Value::Text("x".to_string()),
@@ -1290,7 +1286,7 @@ mod test {
             let stmt = &program.statements[0];
 
             if let StatementEnum::ExpressionStatement(stmt) = stmt {
-                let exp = stmt.expression.as_ref().unwrap();
+                let exp = &stmt.expression;
                 if let ExpressionEnum::FunctionLiteral(function) = exp {
                     assert_eq!(
                         function.parameters.len(),
@@ -1343,7 +1339,7 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::CallExpression(call) = exp {
                 assert!(_test_identifier(call.function.as_ref(), "add"));
 
@@ -1387,10 +1383,7 @@ mod test {
         right: Value,
     ) -> bool {
         if let ExpressionEnum::InfixExpression(op_exp) = exp {
-            assert!(_test_literal_expression(
-                op_exp.left.as_ref().unwrap().as_ref(),
-                left
-            ));
+            assert!(_test_literal_expression(op_exp.left.as_ref(), left));
 
             assert_eq!(
                 op_exp.operator, operator,
@@ -1398,10 +1391,7 @@ mod test {
                 operator, op_exp.operator
             );
 
-            assert!(_test_literal_expression(
-                op_exp.right.as_ref().unwrap().as_ref(),
-                right
-            ));
+            assert!(_test_literal_expression(op_exp.right.as_ref(), right));
 
             true
         } else {
@@ -1527,7 +1517,7 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::StringLiteral(string) = exp {
                 assert_eq!(
                     string.value, "hello world",
@@ -1559,7 +1549,7 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::ArrayLiteral(array) = exp {
                 assert_eq!(
                     array.elements.len(),
@@ -1608,7 +1598,7 @@ mod test {
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
-            let exp = stmt.expression.as_ref().unwrap();
+            let exp = &stmt.expression;
             if let ExpressionEnum::IndexExpression(index) = exp {
                 assert!(_test_identifier(&index.left, "myArray"));
 

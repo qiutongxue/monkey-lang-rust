@@ -13,7 +13,7 @@ use super::{Expression, ExpressionEnum};
 pub struct PrefixExpression {
     pub token: Token, // 前缀操作符，比如 !
     pub operator: String,
-    pub right: Option<Box<ExpressionEnum>>,
+    pub right: Box<ExpressionEnum>,
 }
 
 impl Expression for PrefixExpression {}
@@ -26,6 +26,6 @@ impl Node for PrefixExpression {
 
 impl Display for PrefixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}{})", self.operator, self.right.as_ref().unwrap())
+        write!(f, "({}{})", self.operator, self.right.as_ref())
     }
 }
