@@ -11,8 +11,10 @@ const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
 const NULL: Object = Object::Null;
 
-static BUILTINS: LazyLock<HashMap<String, fn(Vec<Object>) -> Object>> = LazyLock::new(|| {
-    let mut m: HashMap<String, fn(Vec<Object>) -> Object> = HashMap::new();
+type BuiltinMap = HashMap<String, fn(Vec<Object>) -> Object>;
+
+static BUILTINS: LazyLock<BuiltinMap> = LazyLock::new(|| {
+    let mut m: BuiltinMap = HashMap::new();
     m.insert("len".to_string(), |args| {
         if args.len() != 1 {
             return Object::Error(format!(
@@ -130,6 +132,10 @@ fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, E
         }
         ExpressionEnum::BlockStatement(bs) => eval_block_statement(bs, env),
         ExpressionEnum::StringLiteral(sl) => Ok(Object::String(sl.value.to_owned())),
+        ExpressionEnum::ArrayLiteral(al) => {
+            let elements = eval_expressions(&al.elements, env)?;
+            Ok(Object::Array(elements))
+        }
     }
 }
 
@@ -194,7 +200,7 @@ fn eval_identifier(ident: &Identifier, env: RcEnvironment) -> Result<Object, Eva
     if let Some(obj) = env.borrow().get(&ident.value) {
         Ok(obj)
     } else if let Some(builtin) = BUILTINS.get(&ident.value) {
-        Ok(Object::Builtin(builtin.clone()))
+        Ok(Object::Builtin(*builtin))
     } else {
         Err(EvalError::IdentifierNotFound(ident.value.to_string()))
     }
@@ -677,6 +683,26 @@ mod test {
 
                 _ => panic!("expected value is not supported, got={:?}", expected),
             }
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        let evaluated = test_eval(input);
+        if let Object::Array(arr) = evaluated {
+            assert_eq!(
+                arr.len(),
+                3,
+                "array has wrong length. got={}, want={}",
+                arr.len(),
+                3
+            );
+            test_integer_object(&arr[0], 1);
+            test_integer_object(&arr[1], 4);
+            test_integer_object(&arr[2], 6);
+        } else {
+            panic!("object is not Array");
         }
     }
 }

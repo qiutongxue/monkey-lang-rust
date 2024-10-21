@@ -12,6 +12,7 @@ pub enum Object {
     Function(Function),
     String(String),
     Builtin(fn(Vec<Object>) -> Object),
+    Array(Vec<Object>),
 }
 
 impl Object {
@@ -32,6 +33,14 @@ impl Object {
                 format!("fn({}) {{\n{} \n}}", params.join(", "), func.body)
             }
             Object::Builtin(_) => "builtin function".to_string(),
+            Object::Array(vec) => {
+                let mut elements = Vec::with_capacity(vec.len());
+                for element in vec {
+                    elements.push(element.inspect());
+                }
+
+                format!("[{}]", elements.join(", "))
+            }
         }
     }
 
@@ -45,6 +54,7 @@ impl Object {
             Object::Function(_) => true,
             Object::String(s) => !s.is_empty(),
             Object::Builtin(_) => true,
+            Object::Array(_) => true,
         }
     }
 
@@ -58,6 +68,7 @@ impl Object {
             Object::Function(_) => "FUNCTION",
             Object::String(_) => "STRING",
             Object::Builtin(_) => "BUILTIN",
+            Object::Array(_) => "ARRAY",
         }
     }
 

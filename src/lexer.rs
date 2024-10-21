@@ -59,6 +59,8 @@ impl Lexer {
             b')' => tok = Token::from_char(TokenType::RParen, self.ch),
             b'{' => tok = Token::from_char(TokenType::LBrace, self.ch),
             b'}' => tok = Token::from_char(TokenType::RBrace, self.ch),
+            b'[' => tok = Token::from_char(TokenType::LBracket, self.ch),
+            b']' => tok = Token::from_char(TokenType::RBracket, self.ch),
             0 => tok = Token::from_str(TokenType::EOF, ""),
             b'0'..=b'9' => {
                 let literal = self.read_number();
@@ -165,6 +167,7 @@ mod test {
         10 != 9;
         "foobar"
         "foo bar"
+        [1, 2];
         "#;
 
         let tests = [
@@ -243,6 +246,12 @@ mod test {
             (TokenType::Semicolon, ";"),
             (TokenType::String, "foobar"),
             (TokenType::String, "foo bar"),
+            (TokenType::LBracket, "["),
+            (TokenType::Int, "1"),
+            (TokenType::Comma, ","),
+            (TokenType::Int, "2"),
+            (TokenType::RBracket, "]"),
+            (TokenType::Semicolon, ";"),
             (TokenType::EOF, ""),
         ];
 

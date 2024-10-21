@@ -1,3 +1,4 @@
+mod array_literal;
 mod block_statement;
 mod boolean;
 mod call_expression;
@@ -10,6 +11,7 @@ mod prefix_expression;
 mod string_literal;
 
 use crate::impl_node_for_enum;
+pub use array_literal::ArrayLiteral;
 pub use block_statement::BlockStatement;
 pub use boolean::Boolean;
 pub use call_expression::CallExpression;
@@ -39,6 +41,7 @@ pub enum ExpressionEnum {
     IfExpression(IfExpression),
     BlockStatement(BlockStatement),
     StringLiteral(StringLiteral),
+    ArrayLiteral(ArrayLiteral),
 }
 
 impl_node_for_enum!(ExpressionEnum {
@@ -51,5 +54,6 @@ impl_node_for_enum!(ExpressionEnum {
     CallExpression,
     IfExpression,
     BlockStatement,
-    StringLiteral
+    StringLiteral,
+    ArrayLiteral
 });

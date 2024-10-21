@@ -74,6 +74,8 @@ pub enum TokenType {
     RParen,
     LBrace,
     RBrace,
+    LBracket,
+    RBracket,
 
     // 关键字
     Function,
@@ -108,6 +110,8 @@ impl Display for TokenType {
             TokenType::RParen => ")",
             TokenType::LBrace => "{",
             TokenType::RBrace => "}",
+            TokenType::LBracket => "[",
+            TokenType::RBracket => "]",
             TokenType::Function => "FUNCTION",
             TokenType::Let => "LET",
             TokenType::True => "TRUE",

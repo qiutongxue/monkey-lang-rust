@@ -12,7 +12,7 @@ pub enum ParseError {
     ParseIntegerLiteralError,
     ParseIfExpressionError,
     ParseFunctionLiteralError,
-    ParseCallArgumentsError,
+    ParseExpressionListError,
     TokenIsNone,
 }
 
@@ -42,9 +42,9 @@ static PRECEDENCES: LazyLock<HashMap<TokenType, Precedence>> = LazyLock::new(|| 
 });
 
 use crate::ast::{
-    BlockStatement, Boolean, CallExpression, ExpressionEnum, ExpressionStatement, FunctionLiteral,
-    Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
-    Program, ReturnStatement, StatementEnum, StringLiteral,
+    ArrayLiteral, BlockStatement, Boolean, CallExpression, ExpressionEnum, ExpressionStatement,
+    FunctionLiteral, Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement,
+    PrefixExpression, Program, ReturnStatement, StatementEnum, StringLiteral,
 };
 
 type PrefixParseFn = fn(&mut Parser) -> Result<ExpressionEnum, ParseError>;
@@ -95,6 +95,8 @@ impl Parser {
 
         // 遇到 <function> 时，调用 parseFunctionLiteral
         p.register_prefix(TokenType::Function, Self::parse_function_literal);
+        // 遇到 [ 时，调用 parseArrayLiteral
+        p.register_prefix(TokenType::LBracket, Self::parse_array_literal);
 
         // 遇到 ( 时，也有可能时函数调用
         // 例如：add(1, 2 * 3, 4 + 5)，此时左括号 ( 为中缀表达式
@@ -367,6 +369,43 @@ impl Parser {
         }))
     }
 
+    fn parse_array_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
+        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+
+        let elements = self.parse_expression_list(TokenType::RBracket)?;
+
+        Ok(ExpressionEnum::ArrayLiteral(ArrayLiteral {
+            token,
+            elements,
+        }))
+    }
+
+    fn parse_expression_list(&mut self, end: TokenType) -> Result<Vec<ExpressionEnum>, ParseError> {
+        let mut list = vec![];
+
+        if self.peek_token_is(end) {
+            self.next_token();
+            return Ok(list);
+        }
+
+        self.next_token();
+
+        list.push(self.parse_expression(Precedence::Lowest)?);
+
+        while self.peek_token_is(TokenType::Comma) {
+            self.next_token(); // 当前 -> COMMA
+            self.next_token(); // COMMA -> 下一个表达式
+
+            list.push(self.parse_expression(Precedence::Lowest)?);
+        }
+
+        if !self.expect_peek(end) {
+            return Err(ParseError::ParseExpressionListError);
+        }
+
+        Ok(list)
+    }
+
     fn parse_boolean(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
@@ -534,50 +573,13 @@ impl Parser {
     ) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
 
-        let arguments = self.parse_call_arguments()?;
+        let arguments = self.parse_expression_list(TokenType::RParen)?;
 
         Ok(ExpressionEnum::CallExpression(CallExpression {
             token,
             function: function.ok_or(ParseError::TokenIsNone)?,
             arguments,
         }))
-    }
-
-    // 解析表达式列表
-    // <param1>, <param2>, ...)
-    fn parse_call_arguments(&mut self) -> Result<Vec<ExpressionEnum>, ParseError> {
-        let mut args = vec![];
-
-        // 空参数
-        if self.peek_token_is(TokenType::RParen) {
-            self.next_token();
-            return Ok(args);
-        }
-
-        self.next_token();
-
-        let arg = self.parse_expression(Precedence::Lowest);
-
-        if let Ok(arg) = arg {
-            args.push(arg);
-        }
-
-        while self.peek_token_is(TokenType::Comma) {
-            self.next_token(); // 当前 -> COMMA
-            self.next_token(); // COMMA -> 下一个参数
-
-            let arg = self.parse_expression(Precedence::Lowest);
-
-            if let Ok(arg) = arg {
-                args.push(arg);
-            }
-        }
-
-        if !self.expect_peek(TokenType::RParen) {
-            return Err(ParseError::ParseCallArgumentsError);
-        }
-
-        Ok(args)
     }
 
     /// 检查下一个 token 是否是期望的类型（会消耗一个 token）
@@ -1557,6 +1559,63 @@ mod test {
                 );
             } else {
                 panic!("exp is not StringLiteral, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
+    }
+
+    #[test]
+    fn test_parsing_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+
+        let l = Lexer::new(input.to_string());
+        let mut p = Parser::new(l);
+
+        let program = p.parse_program();
+        check_parse_errors(&p);
+
+        assert!(program.is_ok(), "parse_program() returned Error");
+
+        let program = program.unwrap();
+
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.statements does not contain {} statements. got={}",
+            1,
+            program.statements.len()
+        );
+
+        let stmt = &program.statements[0];
+
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::ArrayLiteral(array) = exp {
+                assert_eq!(
+                    array.elements.len(),
+                    3,
+                    "array.elements does not contain 3 elements. got={}",
+                    array.elements.len()
+                );
+
+                assert!(_test_integer_literal(&array.elements[0], 1));
+
+                assert!(_test_infix_expression(
+                    &array.elements[1],
+                    Value::Integer(2),
+                    "*",
+                    Value::Integer(2)
+                ));
+
+                assert!(_test_infix_expression(
+                    &array.elements[2],
+                    Value::Integer(3),
+                    "+",
+                    Value::Integer(3)
+                ));
+            } else {
+                panic!("exp is not ArrayLiteral, got={:?}", exp);
             }
         } else {
             panic!("stmt is not ExpressionStatement, got={:?}", stmt);
