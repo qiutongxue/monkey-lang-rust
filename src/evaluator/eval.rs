@@ -1,37 +1,11 @@
-use std::{collections::HashMap, sync::LazyLock};
-
 use crate::{
     ast::{
         BlockStatement, ExpressionEnum, Identifier, IfExpression, NodeEnum, Program, StatementEnum,
     },
-    object::{Environment, Function, Object, RcEnvironment},
+    object::{Environment, Function, Object, RcEnvironment, FALSE, NULL, TRUE},
 };
 
-const TRUE: Object = Object::Boolean(true);
-const FALSE: Object = Object::Boolean(false);
-const NULL: Object = Object::Null;
-
-type BuiltinMap = HashMap<String, fn(Vec<Object>) -> Object>;
-
-static BUILTINS: LazyLock<BuiltinMap> = LazyLock::new(|| {
-    let mut m: BuiltinMap = HashMap::new();
-    m.insert("len".to_string(), |args| {
-        if args.len() != 1 {
-            return Object::Error(format!(
-                "wrong number of arguments. got={}, want=1",
-                args.len()
-            ));
-        }
-        match &args[0] {
-            Object::String(s) => Object::Integer(s.len() as i64),
-            obj => Object::Error(format!(
-                "argument to `len` not supported, got {}",
-                obj.get_type()
-            )),
-        }
-    });
-    m
-});
+use super::builtin::BUILTINS;
 
 #[derive(Debug)]
 pub enum EvalError {
@@ -61,7 +35,7 @@ impl From<EvalError> for Object {
     }
 }
 
-pub(crate) fn eval(node: NodeEnum, env: RcEnvironment) -> Object {
+pub fn eval(node: NodeEnum, env: RcEnvironment) -> Object {
     (match node {
         NodeEnum::Program(p) => eval_programe(&p, env),
         NodeEnum::StatementEnum(s) => eval_statement(&s, env),
@@ -219,7 +193,7 @@ fn eval_block_statement(block: &BlockStatement, env: RcEnvironment) -> Result<Ob
 fn eval_identifier(ident: &Identifier, env: RcEnvironment) -> Result<Object, EvalError> {
     if let Some(obj) = env.borrow().get(&ident.value) {
         Ok(obj)
-    } else if let Some(builtin) = BUILTINS.get(&ident.value) {
+    } else if let Some(builtin) = BUILTINS.get(ident.value.as_str()) {
         Ok(Object::Builtin(*builtin))
     } else {
         Err(EvalError::IdentifierNotFound(ident.value.to_string()))
