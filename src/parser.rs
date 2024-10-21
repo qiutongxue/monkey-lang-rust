@@ -14,6 +14,7 @@ pub enum ParseError {
     ParseFunctionLiteralError,
     ParseExpressionListError,
     ParseIndexExpressionError,
+    ParseCallExpressionError,
     TokenIsNone,
 }
 
@@ -60,8 +61,8 @@ use crate::token::Token;
 pub struct Parser {
     l: Lexer,
 
-    cur_token: Option<Token>,
-    peek_token: Option<Token>,
+    cur_token: Token,
+    peek_token: Token,
 
     errors: Vec<String>,
 
@@ -70,15 +71,12 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(l: Lexer) -> Self {
+    pub fn new(mut l: Lexer) -> Self {
         let mut p = Parser {
+            cur_token: l.next_token(),
+            peek_token: l.next_token(),
             l,
-
-            cur_token: None,
-            peek_token: None,
-
             errors: Vec::new(),
-
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
         };
@@ -122,10 +120,6 @@ impl Parser {
         p.register_infix(TokenType::LT, Self::parse_infix_expression);
         p.register_infix(TokenType::GT, Self::parse_infix_expression);
 
-        // 跳过两个 token，cur_token 和 peek_token 都会被赋值
-        p.next_token();
-        p.next_token();
-
         p
     }
 
@@ -136,28 +130,19 @@ impl Parser {
     fn peek_error(&mut self, token: TokenType) {
         self.errors.push(format!(
             "expected next token to be {:?}, got {:?} instead",
-            token,
-            self.peek_token
-                .as_ref()
-                .map_or("none".to_string(), |t| t.token_type.to_string())
+            token, self.peek_token
         ));
     }
 
     fn next_token(&mut self) {
-        self.cur_token = self.peek_token.take();
-        self.peek_token = Some(self.l.next_token());
+        self.cur_token = self.peek_token.to_owned();
+        self.peek_token = self.l.next_token();
     }
 
     pub fn parse_program(&mut self) -> Result<Program, ParseError> {
         let mut program = Program { statements: vec![] };
 
-        while self
-            .cur_token
-            .as_ref()
-            .ok_or(ParseError::TokenIsNone)?
-            .token_type
-            != TokenType::EOF
-        {
+        while self.cur_token.token_type != TokenType::EOF {
             let stmt = self.parse_statement();
 
             if let Ok(stmt) = stmt {
@@ -171,12 +156,7 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<StatementEnum, ParseError> {
-        let stmt = match self
-            .cur_token
-            .as_ref()
-            .ok_or(ParseError::TokenIsNone)?
-            .token_type
-        {
+        let stmt = match self.cur_token.token_type {
             TokenType::Let => StatementEnum::LetStatement(self.parse_let_statement()?),
             TokenType::Return => StatementEnum::ReturnStatement(self.parse_return_statement()?),
             _ => StatementEnum::ExpressionStatement(self.parse_expression_statement()?),
@@ -186,7 +166,7 @@ impl Parser {
     }
 
     fn parse_let_statement(&mut self) -> Result<LetStatement, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         // 第一个一定是一个标识符
         if !self.expect_peek(TokenType::Identifier) {
@@ -194,13 +174,8 @@ impl Parser {
         }
 
         let name = Identifier {
-            token: self.cur_token.clone().ok_or(ParseError::TokenIsNone)?,
-            value: self
-                .cur_token
-                .as_ref()
-                .ok_or(ParseError::TokenIsNone)?
-                .literal
-                .clone(),
+            token: self.cur_token.clone(),
+            value: self.cur_token.literal.clone(),
         };
 
         // 第二个一定是 =
@@ -224,7 +199,7 @@ impl Parser {
     ///
     /// return `expression`;
     fn parse_return_statement(&mut self) -> Result<ReturnStatement, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         self.next_token();
 
@@ -245,7 +220,7 @@ impl Parser {
     /// <expression>;
     fn parse_expression_statement(&mut self) -> Result<ExpressionStatement, ParseError> {
         let stmt = ExpressionStatement {
-            token: self.cur_token.clone().ok_or(ParseError::TokenIsNone)?,
+            token: self.cur_token.clone(),
             expression: Some(self.parse_expression(Precedence::Lowest)?),
         };
 
@@ -262,22 +237,11 @@ impl Parser {
     ///
     /// `expression`
     fn parse_expression(&mut self, precedence: Precedence) -> Result<ExpressionEnum, ParseError> {
-        let prefix = self.prefix_parse_fns.get(
-            &self
-                .cur_token
-                .as_ref()
-                .ok_or(ParseError::TokenIsNone)?
-                .token_type,
-        );
+        let prefix = self.prefix_parse_fns.get(&self.cur_token.token_type);
 
         match prefix {
             None => {
-                self.no_prefix_parse_fn_error(
-                    self.cur_token
-                        .as_ref()
-                        .ok_or(ParseError::TokenIsNone)?
-                        .token_type,
-                );
+                self.no_prefix_parse_fn_error(self.cur_token.token_type);
                 Err(ParseError::ParseExpressionError)
             }
             Some(prefix) => {
@@ -285,13 +249,7 @@ impl Parser {
                 while !self.peek_token_is(TokenType::Semicolon)
                     && precedence < self.peek_precedence()
                 {
-                    let infix = self.infix_parse_fns.get(
-                        &self
-                            .peek_token
-                            .as_ref()
-                            .ok_or(ParseError::TokenIsNone)?
-                            .token_type,
-                    );
+                    let infix = self.infix_parse_fns.get(&self.peek_token.token_type);
 
                     match infix {
                         None => return Ok(left_exp),
@@ -308,7 +266,7 @@ impl Parser {
     }
 
     fn parse_prefix_expression(&mut self) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         self.next_token();
 
@@ -325,7 +283,7 @@ impl Parser {
         &mut self,
         left: Option<Box<ExpressionEnum>>,
     ) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         let precedence = self.cur_precedence();
 
@@ -342,7 +300,7 @@ impl Parser {
     }
 
     fn parse_indentifier(&mut self) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         Ok(ExpressionEnum::Identifier(Identifier {
             value: token.literal.clone(),
@@ -351,7 +309,7 @@ impl Parser {
     }
 
     fn parse_integer_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         match token.literal.parse::<i64>() {
             Ok(value) => Ok(ExpressionEnum::IntegerLiteral(IntegerLiteral {
@@ -367,7 +325,7 @@ impl Parser {
     }
 
     fn parse_string_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         Ok(ExpressionEnum::StringLiteral(StringLiteral {
             value: token.literal.clone(),
@@ -376,7 +334,7 @@ impl Parser {
     }
 
     fn parse_array_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         let elements = self.parse_expression_list(TokenType::RBracket)?;
 
@@ -413,7 +371,7 @@ impl Parser {
     }
 
     fn parse_boolean(&mut self) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         Ok(ExpressionEnum::Boolean(Boolean {
             value: self.cur_token_is(TokenType::True),
@@ -438,7 +396,7 @@ impl Parser {
     ///
     /// if (<condition>) <consequence> else <alternative>
     fn parse_if_expression(&mut self) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         if !self.expect_peek(TokenType::LParen) {
             return Err(ParseError::ParseIfExpressionError);
@@ -477,7 +435,7 @@ impl Parser {
     }
 
     fn parse_block_statement(&mut self) -> Result<BlockStatement, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         let mut statements = vec![];
 
@@ -499,7 +457,7 @@ impl Parser {
     /// 解析函数字面量
     /// fn (<param1>, <param2>, ...) <block statement>
     fn parse_function_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         if !self.expect_peek(TokenType::LParen) {
             return Err(ParseError::ParseFunctionLiteralError);
@@ -535,13 +493,8 @@ impl Parser {
         self.next_token();
 
         let ident = Identifier {
-            token: self.cur_token.clone().ok_or(ParseError::TokenIsNone)?,
-            value: self
-                .cur_token
-                .as_ref()
-                .ok_or(ParseError::TokenIsNone)?
-                .literal
-                .clone(),
+            token: self.cur_token.clone(),
+            value: self.cur_token.literal.clone(),
         };
 
         identifiers.push(ident);
@@ -551,13 +504,8 @@ impl Parser {
             self.next_token(); // COMMA -> 下一个参数
 
             let ident = Identifier {
-                token: self.cur_token.clone().ok_or(ParseError::TokenIsNone)?,
-                value: self
-                    .cur_token
-                    .as_ref()
-                    .ok_or(ParseError::TokenIsNone)?
-                    .literal
-                    .clone(),
+                token: self.cur_token.clone(),
+                value: self.cur_token.literal.clone(),
             };
 
             identifiers.push(ident);
@@ -577,13 +525,13 @@ impl Parser {
         &mut self,
         function: Option<Box<ExpressionEnum>>,
     ) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         let arguments = self.parse_expression_list(TokenType::RParen)?;
 
         Ok(ExpressionEnum::CallExpression(CallExpression {
             token,
-            function: function.ok_or(ParseError::TokenIsNone)?,
+            function: function.ok_or(ParseError::ParseCallExpressionError)?,
             arguments,
         }))
     }
@@ -592,7 +540,7 @@ impl Parser {
         &mut self,
         left: Option<Box<ExpressionEnum>>,
     ) -> Result<ExpressionEnum, ParseError> {
-        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+        let token = self.cur_token.clone();
 
         self.next_token();
 
@@ -604,8 +552,8 @@ impl Parser {
 
         Ok(ExpressionEnum::IndexExpression(IndexExpression {
             token,
-            left: left.ok_or(ParseError::TokenIsNone)?,
-            index: index.ok_or(ParseError::TokenIsNone)?,
+            left: left.ok_or(ParseError::ParseIndexExpressionError)?,
+            index: index.ok_or(ParseError::ParseIndexExpressionError)?,
         }))
     }
 
@@ -622,14 +570,12 @@ impl Parser {
 
     /// 检查当前 token 是否是期望的类型
     fn peek_token_is(&self, t: TokenType) -> bool {
-        self.peek_token
-            .as_ref()
-            .map_or(false, |x| x.token_type == t)
+        self.peek_token.token_type == t
     }
 
     /// 检查下一个 token 是否是期望的类型
     fn cur_token_is(&self, t: TokenType) -> bool {
-        self.cur_token.as_ref().map_or(false, |x| x.token_type == t)
+        self.cur_token.token_type == t
     }
 
     fn register_prefix(&mut self, token_type: TokenType, func: PrefixParseFn) {
@@ -646,19 +592,15 @@ impl Parser {
     }
 
     fn peek_precedence(&self) -> Precedence {
-        self.peek_token.as_ref().map_or(Precedence::Lowest, |x| {
-            PRECEDENCES
-                .get(&x.token_type)
-                .map_or(Precedence::Lowest, |x| *x)
-        })
+        PRECEDENCES
+            .get(&self.peek_token.token_type)
+            .map_or(Precedence::Lowest, |x| *x)
     }
 
     fn cur_precedence(&self) -> Precedence {
-        self.cur_token.as_ref().map_or(Precedence::Lowest, |x| {
-            PRECEDENCES
-                .get(&x.token_type)
-                .map_or(Precedence::Lowest, |x| *x)
-        })
+        PRECEDENCES
+            .get(&self.cur_token.token_type)
+            .map_or(Precedence::Lowest, |x| *x)
     }
 }
 
