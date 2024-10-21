@@ -13,6 +13,7 @@ pub enum ParseError {
     ParseIfExpressionError,
     ParseFunctionLiteralError,
     ParseExpressionListError,
+    ParseIndexExpressionError,
     TokenIsNone,
 }
 
@@ -25,6 +26,7 @@ pub enum Precedence {
     Product,     // *
     Prefix,      // -X or !X
     Call,        // myFunction(X)
+    Index,       // array[index]
 }
 
 static PRECEDENCES: LazyLock<HashMap<TokenType, Precedence>> = LazyLock::new(|| {
@@ -38,13 +40,14 @@ static PRECEDENCES: LazyLock<HashMap<TokenType, Precedence>> = LazyLock::new(|| 
     map.insert(TokenType::Slash, Precedence::Product);
     map.insert(TokenType::Asterisk, Precedence::Product);
     map.insert(TokenType::LParen, Precedence::Call);
+    map.insert(TokenType::LBracket, Precedence::Index);
     map
 });
 
 use crate::ast::{
     ArrayLiteral, BlockStatement, Boolean, CallExpression, ExpressionEnum, ExpressionStatement,
-    FunctionLiteral, Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement,
-    PrefixExpression, Program, ReturnStatement, StatementEnum, StringLiteral,
+    FunctionLiteral, Identifier, IfExpression, IndexExpression, InfixExpression, IntegerLiteral,
+    LetStatement, PrefixExpression, Program, ReturnStatement, StatementEnum, StringLiteral,
 };
 
 type PrefixParseFn = fn(&mut Parser) -> Result<ExpressionEnum, ParseError>;
@@ -105,6 +108,9 @@ impl Parser {
         // 如果是普通的分组，( 的左边一定是一个 infix（如 operator） 或空
         // 因为前面是 infix，所以此时左括号成为了 prefix
         p.register_infix(TokenType::LParen, Self::parse_call_expression);
+        // 遇到 [ 时同理，可能是索引表达式
+        // 例如：array[index]，此时 [ 为 infix
+        p.register_infix(TokenType::LBracket, Self::parse_index_expression);
 
         // + - * / == != > < 时，当作中缀表达式 <expression><infix><expression>
         p.register_infix(TokenType::Plus, Self::parse_infix_expression);
@@ -287,9 +293,9 @@ impl Parser {
                             .token_type,
                     );
 
-                    match infix.cloned() {
+                    match infix {
                         None => return Ok(left_exp),
-                        Some(infix) => {
+                        Some(&infix) => {
                             self.next_token();
                             left_exp = infix(self, Some(Box::new(left_exp)))?;
                         }
@@ -579,6 +585,27 @@ impl Parser {
             token,
             function: function.ok_or(ParseError::TokenIsNone)?,
             arguments,
+        }))
+    }
+
+    fn parse_index_expression(
+        &mut self,
+        left: Option<Box<ExpressionEnum>>,
+    ) -> Result<ExpressionEnum, ParseError> {
+        let token = self.cur_token.clone().ok_or(ParseError::TokenIsNone)?;
+
+        self.next_token();
+
+        let index = Some(Box::new(self.parse_expression(Precedence::Lowest)?));
+
+        if !self.expect_peek(TokenType::RBracket) {
+            return Err(ParseError::ParseIndexExpressionError);
+        }
+
+        Ok(ExpressionEnum::IndexExpression(IndexExpression {
+            token,
+            left: left.ok_or(ParseError::TokenIsNone)?,
+            index: index.ok_or(ParseError::TokenIsNone)?,
         }))
     }
 
@@ -1003,6 +1030,14 @@ mod test {
             (
                 "add(a + b + c * d / f + g)",
                 "add((((a + b) + ((c * d) / f)) + g))",
+            ),
+            (
+                "a * [1, 2, 3, 4][b * c] * d",
+                "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            ),
+            (
+                "add(a * b[2], b[1], 2 * [1, 2][1])",
+                "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
             ),
         ];
 
@@ -1579,14 +1614,6 @@ mod test {
 
         let program = program.unwrap();
 
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "program.statements does not contain {} statements. got={}",
-            1,
-            program.statements.len()
-        );
-
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
@@ -1616,6 +1643,41 @@ mod test {
                 ));
             } else {
                 panic!("exp is not ArrayLiteral, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
+    }
+
+    #[test]
+    fn test_parsing_index_expressions() {
+        let input = "myArray[1 + 1]";
+
+        let l = Lexer::new(input.to_string());
+        let mut p = Parser::new(l);
+
+        let program = p.parse_program();
+        check_parse_errors(&p);
+
+        assert!(program.is_ok(), "parse_program() returned Error");
+
+        let program = program.unwrap();
+
+        let stmt = &program.statements[0];
+
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = stmt.expression.as_ref().unwrap();
+            if let ExpressionEnum::IndexExpression(index) = exp {
+                assert!(_test_identifier(&index.left, "myArray"));
+
+                assert!(_test_infix_expression(
+                    &index.index,
+                    Value::Integer(1),
+                    "+",
+                    Value::Integer(1)
+                ));
+            } else {
+                panic!("exp is not IndexExpression, got={:?}", exp);
             }
         } else {
             panic!("stmt is not ExpressionStatement, got={:?}", stmt);

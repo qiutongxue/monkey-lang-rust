@@ -41,6 +41,7 @@ pub enum EvalError {
     MissingExpression,          // 缺少表达式
     IdentifierNotFound(String), // 未找到标识符
     NotAFunction(String),       // 不是函数
+    IndexError(String),         // 数组索引越界
 }
 
 impl From<EvalError> for Object {
@@ -55,6 +56,7 @@ impl From<EvalError> for Object {
             EvalError::UnexpectedError => Object::Error("unexpected error".to_string()),
             EvalError::MissingExpression => Object::Error("missing expression".to_string()),
             EvalError::NotAFunction(msg) => Object::Error(format!("not a function: {}", msg)),
+            EvalError::IndexError(msg) => Object::Error(format!("index error: {}", msg)),
         }
     }
 }
@@ -135,6 +137,24 @@ fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, E
         ExpressionEnum::ArrayLiteral(al) => {
             let elements = eval_expressions(&al.elements, env)?;
             Ok(Object::Array(elements))
+        }
+        ExpressionEnum::IndexExpression(ie) => {
+            let left = eval_expression(ie.left.as_ref(), env.clone())?;
+            let index = eval_expression(ie.index.as_ref(), env)?;
+            match (&left, &index) {
+                (Object::Array(arr), Object::Integer(idx)) => {
+                    if *idx < 0 || *idx as usize >= arr.len() {
+                        Ok(NULL)
+                    } else {
+                        Ok(arr[*idx as usize].clone())
+                    }
+                }
+                _ => Err(EvalError::TypeMismatch(format!(
+                    "index operator not supported, left={}, index={}",
+                    left.get_type(),
+                    index.get_type()
+                ))),
+            }
         }
     }
 }
@@ -703,6 +723,37 @@ mod test {
             test_integer_object(&arr[2], 6);
         } else {
             panic!("object is not Array");
+        }
+    }
+
+    #[test]
+    fn test_array_index_expressions() {
+        let tests = [
+            ("[1, 2, 3][0]", 1.into()),
+            ("[1, 2, 3][1]", 2.into()),
+            ("[1, 2, 3][2]", 3.into()),
+            ("let i = 0; [1][i];", 1.into()),
+            ("[1, 2, 3][1 + 1];", 3.into()),
+            ("let myArray = [1, 2, 3]; myArray[2];", 3.into()),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                6.into(),
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                2.into(),
+            ),
+            ("[1, 2, 3][3]", Value::Null),
+            ("[1, 2, 3][-1]", Value::Null),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Value::Integer(i) = expected {
+                test_integer_object(&evaluated, i);
+            } else {
+                test_null_object(&evaluated);
+            }
         }
     }
 }

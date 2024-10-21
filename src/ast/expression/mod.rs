@@ -5,6 +5,7 @@ mod call_expression;
 mod function_literal;
 mod identifier;
 mod if_expression;
+mod index_expression;
 mod infix_expression;
 mod integer_literal;
 mod prefix_expression;
@@ -18,6 +19,7 @@ pub use call_expression::CallExpression;
 pub use function_literal::FunctionLiteral;
 pub use identifier::Identifier;
 pub use if_expression::IfExpression;
+pub use index_expression::IndexExpression;
 pub use infix_expression::InfixExpression;
 pub use integer_literal::IntegerLiteral;
 pub use prefix_expression::PrefixExpression;
@@ -42,6 +44,7 @@ pub enum ExpressionEnum {
     BlockStatement(BlockStatement),
     StringLiteral(StringLiteral),
     ArrayLiteral(ArrayLiteral),
+    IndexExpression(IndexExpression),
 }
 
 impl_node_for_enum!(ExpressionEnum {
@@ -55,5 +58,6 @@ impl_node_for_enum!(ExpressionEnum {
     IfExpression,
     BlockStatement,
     StringLiteral,
-    ArrayLiteral
+    ArrayLiteral,
+    IndexExpression
 });
