@@ -425,6 +425,7 @@ mod test {
         // Boolean(bool),
         Null,
         String(String),
+        Array(Vec<Value>),
     }
 
     impl From<i64> for Value {
@@ -436,6 +437,12 @@ mod test {
     impl From<&str> for Value {
         fn from(s: &str) -> Self {
             Value::String(s.to_owned())
+        }
+    }
+
+    impl From<Vec<i64>> for Value {
+        fn from(arr: Vec<i64>) -> Self {
+            Self::Array(arr.into_iter().map(|i| i.into()).collect())
         }
     }
 
@@ -646,36 +653,79 @@ mod test {
             (
                 "len(\"one\", \"two\")",
                 "wrong number of arguments. got=2, want=1".into(),
-            ), // ("len([1, 2, 3])", 3),
-               // ("len([])", 0),
-               // ("first([1, 2, 3])", 1),
-               // ("first([])", "empty list has no first element"),
-               // ("last([1, 2, 3])", 3),
-               // ("last([])", "empty list has no last element"),
-               // ("rest([1, 2, 3])", [2, 3].into()),
-               // ("rest([])", "empty list has no rest elements"),
-               // ("push([1, 2], 3)", [1, 2, 3].into()),
-               // ("push([], 1)", [1].into()),
-               // ("puts(123)", "123"),
-               // ("puts(true)", "true"),
-               // ("puts(null)", "null"),
-               // ("puts([1, 2, 3])", "[1, 2, 3]"),
-               // ("puts([])", "[]"),
-               // ("puts(\"hello\")", "hello"),
+            ),
+            ("len([1, 2, 3])", 3.into()),
+            ("len([])", 0.into()),
+            ("first([1, 2, 3])", 1.into()),
+            ("first([])", Value::Null),
+            (
+                "first(123)",
+                "argument to `first` must be ARRAY, got INTEGER".into(),
+            ),
+            ("last([1, 2, 3])", 3.into()),
+            ("last([])", Value::Null),
+            (
+                "last(123)",
+                "argument to `last` must be ARRAY, got INTEGER".into(),
+            ),
+            ("rest([1, 2, 3])", vec![2, 3].into()),
+            ("rest([])", Value::Null),
+            ("push([1, 2], 3)", vec![1, 2, 3].into()),
+            ("push([], 1)", vec![1].into()),
+            // ("puts(123)", "123"),
+            // ("puts(true)", "true"),
+            // ("puts(null)", "null"),
+            // ("puts([1, 2, 3])", "[1, 2, 3]"),
+            // ("puts([])", "[]"),
+            // ("puts(\"hello\")", "hello"),
         ];
 
         for (input, expected) in tests {
             let evaluated = test_eval(input);
             match expected {
-                Value::Integer(i) => test_integer_object(&evaluated, i),
                 Value::String(s) => match evaluated {
                     Object::Error(msg) => {
                         assert_eq!(msg, s, "wrong error message. got={}, want={}", msg, s)
                     }
                     _ => panic!("object is not Error, got={:?}", evaluated),
                 },
+                value => test_object(&evaluated, &value),
+            }
+        }
 
-                _ => panic!("expected value is not supported, got={:?}", expected),
+        fn test_array_object(obj: &Object, expected: &Vec<Value>) {
+            if let Object::Array(arr) = obj {
+                assert_eq!(
+                    arr.len(),
+                    expected.len(),
+                    "array has wrong length. got={}, want={}",
+                    arr.len(),
+                    expected.len()
+                );
+                for (i, obj) in arr.iter().enumerate() {
+                    test_object(obj, &expected[i]);
+                }
+            } else {
+                panic!("object is not Array. got={}", obj.get_type());
+            }
+        }
+
+        fn test_object(obj: &Object, expected: &Value) {
+            match expected {
+                Value::Integer(i) => test_integer_object(obj, *i),
+                Value::String(s) => match obj {
+                    Object::String(obj_s) => {
+                        assert_eq!(
+                            obj_s, s,
+                            "string has wrong value. got={}, want={}",
+                            obj_s, s
+                        )
+                    }
+                    _ => panic!("object is not String, got={:?}", obj),
+                },
+                Value::Null => test_null_object(obj),
+                Value::Array(arr) => test_array_object(obj, arr),
+                // _ => panic!("expected value is not supported, got={:?}", expected),
             }
         }
     }
