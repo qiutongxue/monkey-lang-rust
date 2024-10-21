@@ -11,6 +11,7 @@ pub enum Object {
     Error(String),
     Function(Function),
     String(String),
+    Builtin(fn(Vec<Object>) -> Object),
 }
 
 impl Object {
@@ -30,6 +31,7 @@ impl Object {
 
                 format!("fn({}) {{\n{} \n}}", params.join(", "), func.body)
             }
+            Object::Builtin(_) => "builtin function".to_string(),
         }
     }
 
@@ -42,6 +44,7 @@ impl Object {
             Object::Error(_) => unreachable!(),
             Object::Function(_) => true,
             Object::String(s) => !s.is_empty(),
+            Object::Builtin(_) => true,
         }
     }
 
@@ -54,6 +57,7 @@ impl Object {
             Object::Error(_) => "ERROR",
             Object::Function(_) => "FUNCTION",
             Object::String(_) => "STRING",
+            Object::Builtin(_) => "BUILTIN",
         }
     }
 

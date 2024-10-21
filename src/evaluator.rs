@@ -1,3 +1,5 @@
+use std::{collections::HashMap, sync::LazyLock};
+
 use crate::{
     ast::{
         BlockStatement, ExpressionEnum, Identifier, IfExpression, NodeEnum, Program, StatementEnum,
@@ -8,6 +10,26 @@ use crate::{
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
 const NULL: Object = Object::Null;
+
+static BUILTINS: LazyLock<HashMap<String, fn(Vec<Object>) -> Object>> = LazyLock::new(|| {
+    let mut m: HashMap<String, fn(Vec<Object>) -> Object> = HashMap::new();
+    m.insert("len".to_string(), |args| {
+        if args.len() != 1 {
+            return Object::Error(format!(
+                "wrong number of arguments. got={}, want=1",
+                args.len()
+            ));
+        }
+        match &args[0] {
+            Object::String(s) => Object::Integer(s.len() as i64),
+            obj => Object::Error(format!(
+                "argument to `len` not supported, got {}",
+                obj.get_type()
+            )),
+        }
+    });
+    m
+});
 
 #[derive(Debug)]
 pub enum EvalError {
@@ -121,12 +143,17 @@ fn eval_expressions(exps: &[ExpressionEnum], env: RcEnvironment) -> Result<Vec<O
 }
 
 fn apply_function(func: &Object, args: Vec<Object>) -> Result<Object, EvalError> {
-    if let Object::Function(f) = func {
-        let new_env = extend_function_env(f, args);
-        let evaluated = eval_block_statement(&f.body, new_env)?.unwrap_return_value();
-        Ok(evaluated)
-    } else {
-        Err(EvalError::NotAFunction(func.get_type().to_string()))
+    match func {
+        Object::Function(f) => {
+            let new_env = extend_function_env(f, args);
+            let evaluated = eval_block_statement(&f.body, new_env)?.unwrap_return_value();
+            Ok(evaluated)
+        }
+        Object::Builtin(b) => {
+            let result = b(args);
+            Ok(result)
+        }
+        _ => Err(EvalError::NotAFunction(func.get_type().to_string())),
     }
 }
 
@@ -164,9 +191,13 @@ fn eval_block_statement(block: &BlockStatement, env: RcEnvironment) -> Result<Ob
 }
 
 fn eval_identifier(ident: &Identifier, env: RcEnvironment) -> Result<Object, EvalError> {
-    env.borrow()
-        .get(&ident.value)
-        .ok_or(EvalError::IdentifierNotFound(ident.value.to_string()))
+    if let Some(obj) = env.borrow().get(&ident.value) {
+        Ok(obj)
+    } else if let Some(builtin) = BUILTINS.get(&ident.value) {
+        Ok(Object::Builtin(builtin.clone()))
+    } else {
+        Err(EvalError::IdentifierNotFound(ident.value.to_string()))
+    }
 }
 
 fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Result<Object, EvalError> {
@@ -325,7 +356,7 @@ mod test {
                 value, expected
             );
         } else {
-            panic!("object is not Integer");
+            panic!("object is not Integer, got={obj:?}");
         }
     }
 
@@ -393,11 +424,18 @@ mod test {
         Integer(i64),
         // Boolean(bool),
         Null,
+        String(String),
     }
 
     impl From<i64> for Value {
         fn from(i: i64) -> Self {
             Value::Integer(i)
+        }
+    }
+
+    impl From<&str> for Value {
+        fn from(s: &str) -> Self {
+            Value::String(s.to_owned())
         }
     }
 
@@ -591,6 +629,53 @@ mod test {
                 );
             } else {
                 panic!("object is not String, got={:?}", evaluated);
+            }
+        }
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        let tests = [
+            ("len(\"\")", Value::Integer(0)),
+            ("len(\"four\")", Value::Integer(4)),
+            ("len(\"hello world\")", Value::Integer(11)),
+            (
+                "len(123)",
+                "argument to `len` not supported, got INTEGER".into(),
+            ),
+            (
+                "len(\"one\", \"two\")",
+                "wrong number of arguments. got=2, want=1".into(),
+            ), // ("len([1, 2, 3])", 3),
+               // ("len([])", 0),
+               // ("first([1, 2, 3])", 1),
+               // ("first([])", "empty list has no first element"),
+               // ("last([1, 2, 3])", 3),
+               // ("last([])", "empty list has no last element"),
+               // ("rest([1, 2, 3])", [2, 3].into()),
+               // ("rest([])", "empty list has no rest elements"),
+               // ("push([1, 2], 3)", [1, 2, 3].into()),
+               // ("push([], 1)", [1].into()),
+               // ("puts(123)", "123"),
+               // ("puts(true)", "true"),
+               // ("puts(null)", "null"),
+               // ("puts([1, 2, 3])", "[1, 2, 3]"),
+               // ("puts([])", "[]"),
+               // ("puts(\"hello\")", "hello"),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            match expected {
+                Value::Integer(i) => test_integer_object(&evaluated, i),
+                Value::String(s) => match evaluated {
+                    Object::Error(msg) => {
+                        assert_eq!(msg, s, "wrong error message. got={}, want={}", msg, s)
+                    }
+                    _ => panic!("object is not Error, got={:?}", evaluated),
+                },
+
+                _ => panic!("expected value is not supported, got={:?}", expected),
             }
         }
     }
