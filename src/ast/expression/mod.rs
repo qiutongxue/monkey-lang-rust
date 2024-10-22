@@ -2,6 +2,7 @@ mod array_literal;
 mod block_statement;
 mod boolean;
 mod call_expression;
+mod dict_literal;
 mod function_literal;
 mod identifier;
 mod if_expression;
@@ -16,6 +17,7 @@ pub use array_literal::ArrayLiteral;
 pub use block_statement::BlockStatement;
 pub use boolean::Boolean;
 pub use call_expression::CallExpression;
+pub use dict_literal::DictLiteral;
 pub use function_literal::FunctionLiteral;
 pub use identifier::Identifier;
 pub use if_expression::IfExpression;
@@ -31,7 +33,7 @@ use super::Node;
 /// 会产生值
 pub trait Expression: Node + std::fmt::Debug {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExpressionEnum {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
@@ -45,6 +47,7 @@ pub enum ExpressionEnum {
     StringLiteral(StringLiteral),
     ArrayLiteral(ArrayLiteral),
     IndexExpression(IndexExpression),
+    DictLiteral(DictLiteral),
 }
 
 impl_node_for_enum!(ExpressionEnum {
@@ -59,5 +62,6 @@ impl_node_for_enum!(ExpressionEnum {
     BlockStatement,
     StringLiteral,
     ArrayLiteral,
-    IndexExpression
+    IndexExpression,
+    DictLiteral
 });

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{ast::Node, token::Token};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StringLiteral {
     pub value: String,
     pub token: Token,

@@ -9,7 +9,7 @@ use super::{Expression, ExpressionEnum};
 /// <prefix operator><expression>
 ///
 /// -5 !true
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PrefixExpression {
     pub token: Token, // 前缀操作符，比如 !
     pub operator: String,

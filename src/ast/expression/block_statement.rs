@@ -10,7 +10,7 @@ use super::Expression;
 /// 块表达式
 ///
 /// { <statement 1> <statement 2> ... }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BlockStatement {
     pub token: Token, // token::LBRACE
     pub statements: Vec<StatementEnum>,

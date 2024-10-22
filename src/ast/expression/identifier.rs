@@ -5,7 +5,7 @@ use crate::{ast::Node, token::Token};
 use super::Expression;
 
 /// <identifier> 标识符
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier {
     pub token: Token,
     pub value: String,

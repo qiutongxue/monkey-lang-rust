@@ -17,6 +17,36 @@ pub enum Object {
     String(String),
     Builtin(fn(Vec<Object>) -> Object),
     Array(Vec<Object>),
+    Dict(HashMap<Object, Object>),
+}
+
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Object::Integer(a), Object::Integer(b)) => a == b,
+            (Object::Boolean(a), Object::Boolean(b)) => a == b,
+            (Object::String(a), Object::String(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Object {}
+
+impl std::hash::Hash for Object {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Object::Integer(v) => v.hash(state),
+            Object::Boolean(v) => v.hash(state),
+            Object::Array(vec) => vec.hash(state),
+            Object::String(s) => s.hash(state),
+            _ => unreachable!(), // Object::ReturnValue(v) => v.hash(state),
+                                 // Object::Builtin(_) => "builtin function".hash(state),
+                                 // Object::Error(v) => v.hash(state),
+                                 // Object::Null => "null".hash(state),
+                                 // Object::Function(_) => std::mem::discriminant(self).hash(state),
+        }
+    }
 }
 
 impl Object {
@@ -45,6 +75,14 @@ impl Object {
 
                 format!("[{}]", elements.join(", "))
             }
+            Object::Dict(dict) => {
+                let mut pairs = Vec::with_capacity(dict.len());
+                for (key, value) in dict {
+                    pairs.push(format!("{}: {}", key.inspect(), value.inspect()));
+                }
+
+                format!("{{ {} }}", pairs.join(", "))
+            }
         }
     }
 
@@ -59,6 +97,7 @@ impl Object {
             Object::String(s) => !s.is_empty(),
             Object::Builtin(_) => true,
             Object::Array(_) => true,
+            Object::Dict(_) => true,
         }
     }
 
@@ -73,6 +112,7 @@ impl Object {
             Object::String(_) => "STRING",
             Object::Builtin(_) => "BUILTIN",
             Object::Array(_) => "ARRAY",
+            Object::Dict(_) => "DICTIONARY",
         }
     }
 
@@ -137,4 +177,32 @@ pub struct Function {
     pub parameters: Vec<Identifier>,
     pub body: BlockStatement,
     pub env: RcEnvironment,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    use super::Object;
+
+    #[test]
+    fn test_string_hash() {
+        let hello1 = Object::String("hello".to_string());
+        let hello2 = Object::String("hello".to_string());
+        let diff1 = Object::String("My name is johnny".to_string());
+        let diff2 = Object::String("My name is johnny".to_string());
+
+        assert!(compare_hash(&hello1, &hello2));
+        assert!(!compare_hash(&hello1, &diff1));
+        assert!(compare_hash(&diff1, &diff2));
+    }
+
+    fn compare_hash<T: Hash>(a: &T, b: &T) -> bool {
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+        a.hash(&mut hasher1);
+        b.hash(&mut hasher2);
+
+        hasher1.finish() == hasher2.finish()
+    }
 }

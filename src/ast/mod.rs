@@ -4,7 +4,7 @@ mod statement;
 use std::fmt::Display;
 
 pub use expression::{
-    ArrayLiteral, BlockStatement, Boolean, CallExpression, Expression, ExpressionEnum,
+    ArrayLiteral, BlockStatement, Boolean, CallExpression, DictLiteral, Expression, ExpressionEnum,
     FunctionLiteral, Identifier, IfExpression, IndexExpression, InfixExpression, IntegerLiteral,
     PrefixExpression, StringLiteral,
 };

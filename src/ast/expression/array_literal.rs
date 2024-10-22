@@ -4,7 +4,7 @@ use crate::{ast::Node, token::Token};
 
 use super::ExpressionEnum;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArrayLiteral {
     pub token: Token, // the '[' token
     pub elements: Vec<ExpressionEnum>,

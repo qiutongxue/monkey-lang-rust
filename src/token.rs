@@ -69,6 +69,7 @@ pub enum TokenType {
     // 分隔符
     Comma,
     Semicolon,
+    Colon,
 
     LParen,
     RParen,
@@ -106,6 +107,7 @@ impl Display for TokenType {
             TokenType::NotEQ => "!=",
             TokenType::Comma => ",",
             TokenType::Semicolon => ";",
+            TokenType::Colon => ":",
             TokenType::LParen => "(",
             TokenType::RParen => ")",
             TokenType::LBrace => "{",

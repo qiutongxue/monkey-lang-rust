@@ -55,6 +55,7 @@ impl Lexer {
             }
             b';' => tok = Token::from_char(TokenType::Semicolon, self.ch),
             b',' => tok = Token::from_char(TokenType::Comma, self.ch),
+            b':' => tok = Token::from_char(TokenType::Colon, self.ch),
             b'(' => tok = Token::from_char(TokenType::LParen, self.ch),
             b')' => tok = Token::from_char(TokenType::RParen, self.ch),
             b'{' => tok = Token::from_char(TokenType::LBrace, self.ch),
@@ -168,6 +169,7 @@ mod test {
         "foobar"
         "foo bar"
         [1, 2];
+        {"foo": "bar"};
         "#;
 
         let tests = [
@@ -251,6 +253,12 @@ mod test {
             (TokenType::Comma, ","),
             (TokenType::Int, "2"),
             (TokenType::RBracket, "]"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::LBrace, "{"),
+            (TokenType::String, "foo"),
+            (TokenType::Colon, ":"),
+            (TokenType::String, "bar"),
+            (TokenType::RBrace, "}"),
             (TokenType::Semicolon, ";"),
             (TokenType::EOF, ""),
         ];

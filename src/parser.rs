@@ -60,9 +60,10 @@ static PRECEDENCES: LazyLock<HashMap<TokenType, Precedence>> = LazyLock::new(|| 
 });
 
 use crate::ast::{
-    ArrayLiteral, BlockStatement, Boolean, CallExpression, ExpressionEnum, ExpressionStatement,
-    FunctionLiteral, Identifier, IfExpression, IndexExpression, InfixExpression, IntegerLiteral,
-    LetStatement, PrefixExpression, Program, ReturnStatement, StatementEnum, StringLiteral,
+    ArrayLiteral, BlockStatement, Boolean, CallExpression, DictLiteral, ExpressionEnum,
+    ExpressionStatement, FunctionLiteral, Identifier, IfExpression, IndexExpression,
+    InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement,
+    StatementEnum, StringLiteral,
 };
 
 type PrefixParseFn = fn(&mut Parser) -> Result<ExpressionEnum, ParseError>;
@@ -108,6 +109,7 @@ impl Parser {
         p.register_prefix(TokenType::Function, Self::parse_function_literal);
         // 遇到 [ 时，调用 parseArrayLiteral
         p.register_prefix(TokenType::LBracket, Self::parse_array_literal);
+        p.register_prefix(TokenType::LBrace, Self::parse_dict_literal);
 
         // 遇到 ( 时，也有可能时函数调用
         // 例如：add(1, 2 * 3, 4 + 5)，此时左括号 ( 为中缀表达式
@@ -318,6 +320,26 @@ impl Parser {
             value: token.literal.clone(),
             token,
         }))
+    }
+
+    fn parse_dict_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
+        let token = self.cur_token.clone();
+        let mut pairs = HashMap::new();
+
+        while !self.peek_token_is(TokenType::RBrace) {
+            self.next_token();
+            let key = self.parse_expression(Precedence::Lowest)?;
+            self.expect_peek(TokenType::Colon)?;
+            self.next_token();
+            let value = self.parse_expression(Precedence::Lowest)?;
+            pairs.insert(key, value);
+            if !self.peek_token_is(TokenType::RBrace) {
+                self.expect_peek(TokenType::Comma)?;
+            }
+        }
+        self.expect_peek(TokenType::RBrace)?;
+
+        Ok(ExpressionEnum::DictLiteral(DictLiteral { token, pairs }))
     }
 
     fn parse_array_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
@@ -1345,6 +1367,121 @@ mod test {
                 ));
             } else {
                 panic!("exp is not IndexExpression, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
+    }
+
+    #[test]
+    fn test_parsing_dict_literals_string_keys() {
+        let input = r#"{"one": 1, "two": 2, "three": 3}"#;
+
+        let program = parse_program(input);
+
+        let stmt = &program.statements[0];
+
+        let expected = [("one", 1), ("two", 2), ("three", 3)];
+
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = &stmt.expression;
+            if let ExpressionEnum::DictLiteral(dict) = exp {
+                assert_eq!(
+                    dict.pairs.len(),
+                    3,
+                    "dict.pairs does not contain 3 elements. got={}",
+                    dict.pairs.len()
+                );
+
+                for (key, value) in dict.pairs.iter() {
+                    if let ExpressionEnum::StringLiteral(key) = key {
+                        let expected_key = expected.iter().find(|(k, _)| k == &key.to_string());
+                        if let Some((_, expected_value)) = expected_key {
+                            assert!(_test_integer_literal(value, *expected_value));
+                        } else {
+                            panic!("key not found in expected pairs. key={}", key.to_string());
+                        }
+                    } else {
+                        panic!("key is not StringLiteral, got={:?}", key);
+                    }
+                }
+            } else {
+                panic!("exp is not DictLiteral, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
+    }
+
+    #[test]
+    fn test_parsing_empty_dict_literal() {
+        let input = "{}";
+
+        let program = parse_program(input);
+
+        let stmt = &program.statements[0];
+
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = &stmt.expression;
+            if let ExpressionEnum::DictLiteral(dict) = exp {
+                assert_eq!(
+                    dict.pairs.len(),
+                    0,
+                    "dict.pairs does not contain 0 elements. got={}",
+                    dict.pairs.len()
+                );
+            } else {
+                panic!("exp is not DictLiteral, got={:?}", exp);
+            }
+        } else {
+            panic!("stmt is not ExpressionStatement, got={:?}", stmt);
+        }
+    }
+
+    #[test]
+    fn test_parsing_dict_literals_with_expressions() {
+        let input = r#"{"one": 0 + 1, "two": 10 - 9, "three": 15 / 5}"#;
+
+        let program = parse_program(input);
+
+        let stmt = &program.statements[0];
+
+        let expected: [(&str, fn(&ExpressionEnum) -> bool); 3] = [
+            ("one", |e| {
+                _test_infix_expression(e, Value::Integer(0), "+", Value::Integer(1))
+            }),
+            ("two", |e| {
+                _test_infix_expression(e, Value::Integer(10), "-", Value::Integer(9))
+            }),
+            ("three", |e| {
+                _test_infix_expression(e, Value::Integer(15), "/", Value::Integer(5))
+            }),
+        ];
+
+        if let StatementEnum::ExpressionStatement(stmt) = stmt {
+            let exp = &stmt.expression;
+            if let ExpressionEnum::DictLiteral(dict) = exp {
+                assert_eq!(
+                    dict.pairs.len(),
+                    3,
+                    "dict.pairs does not contain 3 elements. got={}",
+                    dict.pairs.len()
+                );
+
+                for (key, value) in dict.pairs.iter() {
+                    if let ExpressionEnum::StringLiteral(key) = key {
+                        let expected_key = expected.iter().find(|(k, _)| k == &key.to_string());
+                        if let Some((_, expected_value)) = expected_key {
+                            assert!(expected_value(value));
+                        } else {
+                            panic!("key not found in expected pairs. key={}", key.to_string());
+                        }
+                    } else {
+                        panic!("key is not StringLiteral, got={:?}", key);
+                    }
+                }
+            } else {
+                panic!("exp is not DictLiteral, got={:?}", exp);
             }
         } else {
             panic!("stmt is not ExpressionStatement, got={:?}", stmt);

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     ast::{
         BlockStatement, ExpressionEnum, Identifier, IfExpression, NodeEnum, Program, StatementEnum,
@@ -113,6 +115,14 @@ fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, E
                         Ok(arr[*idx as usize].clone())
                     }
                 }
+                (Object::Dict(dict), key) => {
+                    ensure_key_type_is_valid(key)?;
+                    if let Some(value) = dict.get(key) {
+                        Ok(value.clone())
+                    } else {
+                        Ok(NULL)
+                    }
+                }
                 _ => Err(EvalError::TypeMismatch(format!(
                     "index operator not supported, left={}, index={}",
                     left.get_type(),
@@ -120,9 +130,28 @@ fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, E
                 ))),
             }
         }
+        ExpressionEnum::DictLiteral(dict_literal) => {
+            let mut dict = HashMap::with_capacity(dict_literal.pairs.len());
+            for (key, value) in dict_literal.pairs.iter() {
+                let key = eval_expression(key, env.clone())?;
+                ensure_key_type_is_valid(&key)?;
+                let value = eval_expression(value, env.clone())?;
+                dict.insert(key, value);
+            }
+            Ok(Object::Dict(dict))
+        }
     }
 }
 
+fn ensure_key_type_is_valid(key: &Object) -> Result<(), EvalError> {
+    match key {
+        Object::String(_) | Object::Integer(_) | Object::Boolean(_) => Ok(()),
+        _ => Err(EvalError::TypeMismatch(format!(
+            "dict key must be string, integer or boolean, got {}",
+            key.get_type()
+        ))),
+    }
+}
 fn eval_expressions(exps: &[ExpressionEnum], env: RcEnvironment) -> Result<Vec<Object>, EvalError> {
     let mut result = Vec::with_capacity(exps.len());
     for exp in exps {
@@ -289,10 +318,12 @@ fn native_bool_to_boolean_object(input: bool) -> Object {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use crate::{
         ast::NodeEnum,
         lexer::Lexer,
-        object::{Environment, Object},
+        object::{Environment, Object, FALSE, TRUE},
         parser::Parser,
     };
 
@@ -753,6 +784,72 @@ mod test {
             ),
             ("[1, 2, 3][3]", Value::Null),
             ("[1, 2, 3][-1]", Value::Null),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Value::Integer(i) = expected {
+                test_integer_object(&evaluated, i);
+            } else {
+                test_null_object(&evaluated);
+            }
+        }
+    }
+
+    #[test]
+    fn test_dict_literals() {
+        let input = r#"
+        let two = "two";
+        {
+            "one": 10 - 9,
+            two: 1 + 1,
+            "thr" + "ee": 6 / 2,
+            4: 4,
+            true: 5,
+            false: 6
+        }
+        "#;
+        let evaluated = test_eval(input);
+        if let Object::Dict(dict) = evaluated {
+            let expected = HashMap::from([
+                (Object::String("one".to_string()), 1),
+                (Object::String("two".to_string()), 2),
+                (Object::String("three".to_string()), 3),
+                (Object::Integer(4), 4),
+                (TRUE, 5),
+                (FALSE, 6),
+            ]);
+            assert_eq!(dict.len(), expected.len());
+            for (key, value) in expected {
+                let obj = dict.get(&key);
+                if let Some(obj) = obj {
+                    test_integer_object(obj, value);
+                } else {
+                    panic!("key not found in dictionary, key={:?}", key);
+                }
+            }
+        } else {
+            panic!("object is not Dictionary, got={:?}", evaluated);
+        }
+    }
+
+    #[test]
+    fn test_dict_index_expressions() {
+        let tests = [
+            (r#"{ "one": 1, "two": 2, "three": 3 }["one"]"#, 1.into()),
+            (r#"{ "one": 1, "two": 2, "three": 3 }["two"]"#, 2.into()),
+            (r#"{ "one": 1, "two": 2, "three": 3 }["three"]"#, 3.into()),
+            (r#"{ 1: 1, 2: 2, 3: 3 }[1]"#, 1.into()),
+            (r#"{ 1: 1, 2: 2, 3: 3 }[2]"#, 2.into()),
+            (r#"{ 1: 1, 2: 2, 3: 3 }[3]"#, 3.into()),
+            (r#"{ true: 1, false: 2 }[true]"#, 1.into()),
+            (r#"{ true: 1, false: 2 }[false]"#, 2.into()),
+            (r#"{ "one": 1, "two": 2, "three": 3 }["four"]"#, Value::Null),
+            (r#"{ "one": 1, "two": 2, "three": 3 }[0]"#, Value::Null),
+            (r#"{ "one": 1, "two": 2, "three": 3 }[-1]"#, Value::Null),
+            (r#"let key = "foo"; { key: 5 }[key]"#, 5.into()),
+            (r#"{}["foo"]"#, Value::Null),
+            (r#"let d = { "foo": 5 }; d["foo"]"#, 5.into()),
         ];
 
         for (input, expected) in tests {

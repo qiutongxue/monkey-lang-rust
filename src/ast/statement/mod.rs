@@ -14,7 +14,7 @@ use super::Node;
 /// 不产生值
 pub trait Statement: Node + std::fmt::Debug {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StatementEnum {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),

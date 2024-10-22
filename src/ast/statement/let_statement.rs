@@ -13,7 +13,7 @@ use super::Statement;
 /// let 语句
 ///
 /// let <identifier> = <expression>;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LetStatement {
     pub(crate) token: Token, // token::LET
     pub(crate) name: Identifier,

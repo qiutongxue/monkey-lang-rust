@@ -9,7 +9,7 @@ use super::{Expression, ExpressionEnum};
 /// <expression>(<comma separated expressions>)
 /// add(2, 3)
 /// fn(x, y) {x + y;}(1, 2)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CallExpression {
     pub token: Token, // token::LPAREN
     pub function: Box<ExpressionEnum>,
