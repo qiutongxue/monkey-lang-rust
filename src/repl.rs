@@ -32,23 +32,12 @@ pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
         let lexer = lexer::Lexer::new(line);
         let mut parser = parser::Parser::new(lexer);
 
-        if let Ok(program) = parser.parse_program() {
-            if !parser.errors().is_empty() {
-                print_parse_errors(parser.errors());
-                continue;
+        match parser.parse_program() {
+            Ok(program) => {
+                let evaluated = evaluator::eval(NodeEnum::Program(program), env.clone());
+                println!("{}", evaluated.inspect());
             }
-
-            let evaluated = evaluator::eval(NodeEnum::Program(program), env.clone());
-
-            println!("{}", evaluated.inspect()); // println!("{}", program.to_string());
+            Err(error) => eprintln!("{}", error),
         }
-    }
-}
-
-fn print_parse_errors(errors: &Vec<String>) {
-    eprintln!("Woops! We ran into some monkey business here!\n");
-    eprintln!(" parser errors:");
-    for error in errors {
-        eprintln!("\t{}", error);
     }
 }

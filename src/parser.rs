@@ -1,21 +1,35 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::sync::LazyLock;
 
 use crate::token::TokenType;
 
 #[derive(Debug)]
 pub enum ParseError {
-    ParseProgramError,
-    ParseLetStatementError,
-    ParseExpressionError,
-    ParseGroupedExpressionError,
-    ParseIntegerLiteralError,
-    ParseIfExpressionError,
-    ParseFunctionLiteralError,
-    ParseExpressionListError,
-    ParseIndexExpressionError,
-    ParseCallExpressionError,
-    TokenIsNone,
+    ParseIntegerLiteralError(String),
+    UnexpectedToken(TokenType, String),
+    NoPrefixParseFn(TokenType),
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ParseError:\n\t")?;
+        match self {
+            ParseError::ParseIntegerLiteralError(s) => {
+                write!(f, "ParseIntegerLiteralError: can{}", s)
+            }
+            ParseError::UnexpectedToken(token_type, literal) => write!(
+                f,
+                "UnexpectedToken: expected next token to be {:?}, got {:?} instead",
+                token_type, literal
+            ),
+            ParseError::NoPrefixParseFn(token_type) => write!(
+                f,
+                "NoPrefixParseFn: no prefix parse function for {:?} found",
+                token_type
+            ),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
@@ -63,8 +77,6 @@ pub struct Parser {
     cur_token: Token,
     peek_token: Token,
 
-    errors: Vec<String>,
-
     prefix_parse_fns: HashMap<TokenType, PrefixParseFn>,
     infix_parse_fns: HashMap<TokenType, InfixParseFn>,
 }
@@ -75,7 +87,6 @@ impl Parser {
             cur_token: l.next_token(),
             peek_token: l.next_token(),
             l,
-            errors: Vec::new(),
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
         };
@@ -122,17 +133,6 @@ impl Parser {
         p
     }
 
-    pub(crate) fn errors(&self) -> &Vec<String> {
-        &self.errors
-    }
-
-    fn peek_error(&mut self, token: TokenType) {
-        self.errors.push(format!(
-            "expected next token to be {:?}, got {:?} instead",
-            token, self.peek_token
-        ));
-    }
-
     fn next_token(&mut self) {
         self.cur_token = self.peek_token.to_owned();
         self.peek_token = self.l.next_token();
@@ -142,12 +142,8 @@ impl Parser {
         let mut program = Program { statements: vec![] };
 
         while self.cur_token.token_type != TokenType::EOF {
-            let stmt = self.parse_statement();
-
-            if let Ok(stmt) = stmt {
-                program.statements.push(stmt);
-            }
-
+            let stmt = self.parse_statement()?;
+            program.statements.push(stmt);
             self.next_token();
         }
 
@@ -168,9 +164,7 @@ impl Parser {
         let token = self.cur_token.clone();
 
         // 第一个一定是一个标识符
-        if !self.expect_peek(TokenType::Identifier) {
-            return Err(ParseError::ParseLetStatementError);
-        }
+        self.expect_peek(TokenType::Identifier)?;
 
         let name = Identifier {
             token: self.cur_token.clone(),
@@ -178,9 +172,7 @@ impl Parser {
         };
 
         // 第二个一定是 =
-        if !self.expect_peek(TokenType::Assign) {
-            return Err(ParseError::ParseLetStatementError);
-        }
+        self.expect_peek(TokenType::Assign)?;
 
         // skip =
         self.next_token();
@@ -240,8 +232,8 @@ impl Parser {
 
         match prefix {
             None => {
-                self.no_prefix_parse_fn_error(self.cur_token.token_type);
-                Err(ParseError::ParseExpressionError)
+                // self.no_prefix_parse_fn_error(self.cur_token.token_type);
+                Err(ParseError::NoPrefixParseFn(self.cur_token.token_type))
             }
             Some(prefix) => {
                 let mut left_exp = prefix(self)?;
@@ -315,11 +307,7 @@ impl Parser {
                 value,
                 token,
             })),
-            Err(_) => {
-                self.errors
-                    .push(format!("could not parse {} as integer", token.literal));
-                Err(ParseError::ParseIntegerLiteralError)
-            }
+            Err(_) => Err(ParseError::ParseIntegerLiteralError(token.literal.clone())),
         }
     }
 
@@ -362,9 +350,7 @@ impl Parser {
             list.push(self.parse_expression(Precedence::Lowest)?);
         }
 
-        if !self.expect_peek(end) {
-            return Err(ParseError::ParseExpressionListError);
-        }
+        self.expect_peek(end)?;
 
         Ok(list)
     }
@@ -384,9 +370,7 @@ impl Parser {
 
         let exp = self.parse_expression(Precedence::Lowest);
 
-        if !self.expect_peek(TokenType::RParen) {
-            return Err(ParseError::ParseGroupedExpressionError);
-        }
+        self.expect_peek(TokenType::RParen)?;
 
         exp
     }
@@ -397,30 +381,21 @@ impl Parser {
     fn parse_if_expression(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone();
 
-        if !self.expect_peek(TokenType::LParen) {
-            return Err(ParseError::ParseIfExpressionError);
-        }
+        self.expect_peek(TokenType::LParen)?;
 
         self.next_token();
 
         let condition = Box::new(self.parse_expression(Precedence::Lowest)?);
 
-        if !self.expect_peek(TokenType::RParen) {
-            return Err(ParseError::ParseIfExpressionError);
-        }
-
-        if !self.expect_peek(TokenType::LBrace) {
-            return Err(ParseError::ParseIfExpressionError);
-        }
+        self.expect_peek(TokenType::RParen)?;
+        self.expect_peek(TokenType::LBrace)?;
 
         let consequence = self.parse_block_statement()?;
         let mut alternative = None;
         if self.peek_token_is(TokenType::Else) {
             self.next_token();
 
-            if !self.expect_peek(TokenType::LBrace) {
-                return Err(ParseError::ParseIfExpressionError);
-            }
+            self.expect_peek(TokenType::LBrace)?;
 
             alternative = self.parse_block_statement().ok();
         }
@@ -458,15 +433,11 @@ impl Parser {
     fn parse_function_literal(&mut self) -> Result<ExpressionEnum, ParseError> {
         let token = self.cur_token.clone();
 
-        if !self.expect_peek(TokenType::LParen) {
-            return Err(ParseError::ParseFunctionLiteralError);
-        }
+        self.expect_peek(TokenType::LParen)?;
 
         let parameters = self.parse_function_parameters()?;
 
-        if !self.expect_peek(TokenType::LBrace) {
-            return Err(ParseError::ParseFunctionLiteralError);
-        }
+        self.expect_peek(TokenType::LBrace)?;
 
         let body = self.parse_block_statement()?;
 
@@ -510,9 +481,7 @@ impl Parser {
             identifiers.push(ident);
         }
 
-        if !self.expect_peek(TokenType::RParen) {
-            return Err(ParseError::ParseFunctionLiteralError);
-        }
+        self.expect_peek(TokenType::RParen)?;
 
         Ok(identifiers)
     }
@@ -545,9 +514,7 @@ impl Parser {
 
         let index = Box::new(self.parse_expression(Precedence::Lowest)?);
 
-        if !self.expect_peek(TokenType::RBracket) {
-            return Err(ParseError::ParseIndexExpressionError);
-        }
+        self.expect_peek(TokenType::RBracket)?;
 
         Ok(ExpressionEnum::IndexExpression(IndexExpression {
             token,
@@ -557,13 +524,15 @@ impl Parser {
     }
 
     /// 检查下一个 token 是否是期望的类型（会消耗一个 token）
-    fn expect_peek(&mut self, t: TokenType) -> bool {
+    fn expect_peek(&mut self, t: TokenType) -> Result<(), ParseError> {
         if self.peek_token_is(t) {
             self.next_token();
-            true
+            Ok(())
         } else {
-            self.peek_error(t);
-            false
+            Err(ParseError::UnexpectedToken(
+                t,
+                self.peek_token.literal.clone(),
+            ))
         }
     }
 
@@ -583,11 +552,6 @@ impl Parser {
 
     fn register_infix(&mut self, token_type: TokenType, func: InfixParseFn) {
         self.infix_parse_fns.insert(token_type, func);
-    }
-
-    fn no_prefix_parse_fn_error(&mut self, t: TokenType) {
-        self.errors
-            .push(format!("no prefix parse function for {:?} found", t));
     }
 
     fn peek_precedence(&self) -> Precedence {
@@ -610,7 +574,7 @@ mod test {
 
     use super::Parser;
     use crate::{
-        ast::{ExpressionEnum, Node, StatementEnum},
+        ast::{ExpressionEnum, Node, Program, StatementEnum},
         lexer::Lexer,
     };
 
@@ -620,18 +584,17 @@ mod test {
         Text(String),
     }
 
-    fn check_parse_errors(p: &Parser) {
-        let errors = p.errors();
-        if errors.len() == 0 {
-            return;
-        }
-        eprintln!("parser has {} errors", errors.len());
+    fn parse_program(input: &str) -> Program {
+        let l = Lexer::new(input.to_string());
+        let mut p = Parser::new(l);
 
-        for msg in errors {
-            eprintln!("parser error: {}", msg);
-        }
-
-        panic!();
+        let program = p.parse_program();
+        assert!(
+            program.is_ok(),
+            "parse_program() returned Error: {}",
+            program.err().unwrap()
+        );
+        program.unwrap()
     }
 
     #[test]
@@ -644,23 +607,8 @@ mod test {
 
         for tt in tests {
             let (input, expected_indent, expected_value) = tt;
-            let l = Lexer::new(input.to_string());
-            let mut p = Parser::new(l);
 
-            let program = p.parse_program();
-            check_parse_errors(&p);
-
-            assert!(program.is_ok(), "parse_program() returned Error");
-
-            let program = program.unwrap();
-
-            assert_eq!(
-                program.statements.len(),
-                1,
-                "program.statements does not contain {} statements. got={}",
-                1,
-                program.statements.len()
-            );
+            let program = parse_program(input);
 
             let stmt = &program.statements[0];
 
@@ -685,24 +633,7 @@ mod test {
 
         for tt in tests {
             let (input, expected_value) = tt;
-            let l = Lexer::new(input.to_string());
-            let mut p = Parser::new(l);
-
-            let program = p.parse_program();
-            check_parse_errors(&p);
-
-            assert!(program.is_ok(), "parse_program() returned Error");
-
-            let program = program.unwrap();
-
-            assert_eq!(
-                program.statements.len(),
-                1,
-                "program.statements does not contain {} statements. got={}",
-                1,
-                program.statements.len()
-            );
-
+            let program = parse_program(input);
             let stmt = &program.statements[0];
 
             assert_eq!(
@@ -725,23 +656,7 @@ mod test {
     fn test_identifier_expressions() {
         let input = "foobar;";
 
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
-
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "program.statements does not contain {} statements. got={}",
-            1,
-            program.statements.len()
-        );
+        let program = parse_program(input);
 
         let stmt = &program.statements[0];
 
@@ -771,24 +686,7 @@ mod test {
     #[test]
     fn test_integer_literal_expression() {
         let input = "5;";
-
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
-
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "program.statements does not contain {} statements. got={}",
-            1,
-            program.statements.len()
-        );
+        let program = parse_program(input);
 
         let stmt = &program.statements[0];
 
@@ -822,24 +720,7 @@ mod test {
 
         for tt in prefix_tests {
             let (input, operator, value) = tt;
-            let l = Lexer::new(input.to_string());
-            let mut p = Parser::new(l);
-
-            let program = p.parse_program();
-            check_parse_errors(&p);
-
-            assert!(program.is_ok(), "parse_program() returned Error");
-
-            let program = program.unwrap();
-
-            assert_eq!(
-                program.statements.len(),
-                1,
-                "program.statements does not contain {} statements. got={}",
-                1,
-                program.statements.len()
-            );
-
+            let program = parse_program(input);
             let stmt = &program.statements[0];
 
             if let StatementEnum::ExpressionStatement(stmt) = stmt {
@@ -894,23 +775,7 @@ mod test {
 
         for tt in infix_tests {
             let (input, left_value, operator, right_value) = tt;
-            let l = Lexer::new(input.to_string());
-            let mut p = Parser::new(l);
-
-            let program = p.parse_program();
-            check_parse_errors(&p);
-
-            assert!(program.is_ok(), "parse_program() returned Error");
-
-            let program = program.unwrap();
-
-            assert_eq!(
-                program.statements.len(),
-                1,
-                "program.statements does not contain {} statements. got={}",
-                1,
-                program.statements.len()
-            );
+            let program = parse_program(input);
 
             let stmt = &program.statements[0];
 
@@ -922,14 +787,8 @@ mod test {
                     right_value,
                 ));
             } else {
+                panic!("stmt is not ExpressionStatement, got={:?}", stmt);
             }
-            // let exp_stmt = stmt.as_any().downcast_ref::<ExpressionStatement>();
-
-            // assert!(
-            //     exp_stmt.is_some(),
-            //     "stmt is not ExpressionStatement, got={:?}",
-            //     stmt
-            // );
         }
     }
 
@@ -981,15 +840,7 @@ mod test {
 
         for tt in tests {
             let (input, expected) = tt;
-            let l = Lexer::new(input.to_string());
-            let mut p = Parser::new(l);
-
-            let program = p.parse_program();
-            check_parse_errors(&p);
-
-            assert!(program.is_ok(), "parse_program() returned Error");
-
-            let program = program.unwrap();
+            let program = parse_program(input);
 
             let actual = program.to_string();
 
@@ -1000,24 +851,7 @@ mod test {
     #[test]
     fn test_boolean_expression() {
         let input = "true;";
-
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
-
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "program.statements does not contain {} statements. got={}",
-            1,
-            program.statements.len()
-        );
+        let program = parse_program(input);
 
         let stmt = &program.statements[0];
 
@@ -1047,24 +881,7 @@ mod test {
     #[test]
     fn test_if_expression() {
         let input = "if (x < y) { x }";
-
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
-
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "program.statements does not contain {} statements. got={}",
-            1,
-            program.statements.len()
-        );
+        let program = parse_program(input);
 
         let stmt = &program.statements[0];
 
@@ -1114,23 +931,7 @@ mod test {
     fn test_if_else_expression() {
         let input = "if (x < y) { x } else { y }";
 
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
-
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "program.statements does not contain {} statements. got={}",
-            1,
-            program.statements.len()
-        );
+        let program = parse_program(input);
 
         let stmt = &program.statements[0];
 
@@ -1193,23 +994,7 @@ mod test {
     fn test_function_literal_parsing() {
         let input = "fn(x, y) { x + y; }";
 
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
-
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "program.statements does not contain {} statements. got={}",
-            1,
-            program.statements.len()
-        );
+        let program = parse_program(input);
 
         let stmt = &program.statements[0];
 
@@ -1273,15 +1058,7 @@ mod test {
 
         for tt in tests {
             let (input, expected_params) = tt;
-            let l = Lexer::new(input.to_string());
-            let mut p = Parser::new(l);
-
-            let program = p.parse_program();
-            check_parse_errors(&p);
-
-            assert!(program.is_ok(), "parse_program() returned Error");
-
-            let program = program.unwrap();
+            let program = parse_program(input);
 
             let stmt = &program.statements[0];
 
@@ -1317,25 +1094,7 @@ mod test {
     #[test]
     fn test_call_expression_parsing() {
         let input = "add(1, 2 * 3, 4 + 5);";
-
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
-
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "program.statements does not contain {} statements. got={}",
-            1,
-            program.statements.len()
-        );
-
+        let program = parse_program(input);
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
@@ -1505,15 +1264,7 @@ mod test {
     #[test]
     fn test_string_literal_expression() {
         let input = r#""hello world";"#;
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
+        let program = parse_program(input);
         let stmt = &program.statements[0];
 
         if let StatementEnum::ExpressionStatement(stmt) = stmt {
@@ -1536,15 +1287,7 @@ mod test {
     fn test_parsing_array_literals() {
         let input = "[1, 2 * 2, 3 + 3]";
 
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
+        let program = parse_program(input);
 
         let stmt = &program.statements[0];
 
@@ -1585,15 +1328,7 @@ mod test {
     fn test_parsing_index_expressions() {
         let input = "myArray[1 + 1]";
 
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        check_parse_errors(&p);
-
-        assert!(program.is_ok(), "parse_program() returned Error");
-
-        let program = program.unwrap();
+        let program = parse_program(input);
 
         let stmt = &program.statements[0];
 
