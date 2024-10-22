@@ -45,18 +45,18 @@ pub enum Precedence {
 }
 
 static PRECEDENCES: LazyLock<HashMap<TokenType, Precedence>> = LazyLock::new(|| {
-    let mut map = HashMap::new();
-    map.insert(TokenType::EQ, Precedence::Equals);
-    map.insert(TokenType::NotEQ, Precedence::Equals);
-    map.insert(TokenType::LT, Precedence::LessGreater);
-    map.insert(TokenType::GT, Precedence::LessGreater);
-    map.insert(TokenType::Plus, Precedence::Sum);
-    map.insert(TokenType::Minus, Precedence::Sum);
-    map.insert(TokenType::Slash, Precedence::Product);
-    map.insert(TokenType::Asterisk, Precedence::Product);
-    map.insert(TokenType::LParen, Precedence::Call);
-    map.insert(TokenType::LBracket, Precedence::Index);
-    map
+    HashMap::from([
+        (TokenType::EQ, Precedence::Equals),
+        (TokenType::NotEQ, Precedence::Equals),
+        (TokenType::LT, Precedence::LessGreater),
+        (TokenType::GT, Precedence::LessGreater),
+        (TokenType::Plus, Precedence::Sum),
+        (TokenType::Minus, Precedence::Sum),
+        (TokenType::Slash, Precedence::Product),
+        (TokenType::Asterisk, Precedence::Product),
+        (TokenType::LParen, Precedence::Call),
+        (TokenType::LBracket, Precedence::Index),
+    ])
 });
 
 use crate::ast::{

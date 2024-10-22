@@ -1,17 +1,17 @@
+use std::collections::HashMap;
 use std::{fmt::Display, sync::LazyLock};
 
-static KEYWORDS: LazyLock<std::collections::HashMap<&'static str, TokenType>> =
-    LazyLock::new(|| {
-        let mut map = std::collections::HashMap::new();
-        map.insert("fn", TokenType::Function);
-        map.insert("let", TokenType::Let);
-        map.insert("true", TokenType::True);
-        map.insert("false", TokenType::False);
-        map.insert("if", TokenType::If);
-        map.insert("else", TokenType::Else);
-        map.insert("return", TokenType::Return);
-        map
-    });
+static KEYWORDS: LazyLock<HashMap<&'static str, TokenType>> = LazyLock::new(|| {
+    HashMap::from([
+        ("fn", TokenType::Function),
+        ("let", TokenType::Let),
+        ("true", TokenType::True),
+        ("false", TokenType::False),
+        ("if", TokenType::If),
+        ("else", TokenType::Else),
+        ("return", TokenType::Return),
+    ])
+});
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Token {

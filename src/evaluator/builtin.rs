@@ -2,7 +2,8 @@ use std::{collections::HashMap, sync::LazyLock};
 
 use crate::object::{Object, NULL};
 
-type BuiltinMap = HashMap<&'static str, fn(Vec<Object>) -> Object>;
+type BuiltinFn = fn(Vec<Object>) -> Object;
+type BuiltinMap = HashMap<&'static str, BuiltinFn>;
 
 pub static BUILTINS: LazyLock<BuiltinMap> = LazyLock::new(|| {
     let mut m: BuiltinMap = HashMap::new();
