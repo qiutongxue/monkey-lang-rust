@@ -12,6 +12,7 @@ pub static BUILTINS: LazyLock<BuiltinMap> = LazyLock::new(|| {
     m.insert("last", last);
     m.insert("rest", rest);
     m.insert("push", push);
+    m.insert("puts", puts);
     m
 });
 
@@ -103,4 +104,12 @@ fn push(args: Vec<Object>) -> Object {
             obj.get_type()
         )),
     }
+}
+
+fn puts(args: Vec<Object>) -> Object {
+    for arg in args {
+        println!("{}", arg.inspect());
+    }
+
+    Object::Null
 }
