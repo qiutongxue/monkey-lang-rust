@@ -598,13 +598,8 @@ mod test {
     use crate::{
         ast::{ExpressionEnum, Node, Program, StatementEnum},
         lexer::Lexer,
+        test_utils::Value,
     };
-
-    enum Value {
-        Integer(i64),
-        Boolean(bool),
-        Text(String),
-    }
 
     fn parse_program(input: &str) -> Program {
         let l = Lexer::new(input.to_string());
@@ -624,7 +619,7 @@ mod test {
         let tests = [
             ("let x = 5;", "x", Value::Integer(5)),
             ("let y = true;", "y", Value::Boolean(true)),
-            ("let foobar = y;", "foobar", Value::Text("y".to_string())),
+            ("let foobar = y;", "foobar", Value::String("y".to_string())),
         ];
 
         for tt in tests {
@@ -650,7 +645,7 @@ mod test {
         let tests = [
             ("return 5;", Value::Integer(5)),
             ("return true;", Value::Boolean(true)),
-            ("return foobar;", Value::Text("foobar".to_string())),
+            ("return foobar;", Value::String("foobar".to_string())),
         ];
 
         for tt in tests {
@@ -912,9 +907,9 @@ mod test {
             if let ExpressionEnum::IfExpression(if_exp) = exp {
                 assert!(_test_infix_expression(
                     if_exp.condition.as_ref(),
-                    Value::Text("x".to_string()),
+                    Value::String("x".to_string()),
                     "<",
-                    Value::Text("y".to_string()),
+                    Value::String("y".to_string()),
                 ));
 
                 assert_eq!(
@@ -962,9 +957,9 @@ mod test {
             if let ExpressionEnum::IfExpression(if_exp) = exp {
                 assert!(_test_infix_expression(
                     if_exp.condition.as_ref(),
-                    Value::Text("x".to_string()),
+                    Value::String("x".to_string()),
                     "<",
-                    Value::Text("y".to_string()),
+                    Value::String("y".to_string()),
                 ));
 
                 assert_eq!(
@@ -1055,9 +1050,9 @@ mod test {
                     let body_exp = &body_stmt.expression;
                     assert!(_test_infix_expression(
                         body_exp,
-                        Value::Text("x".to_string()),
+                        Value::String("x".to_string()),
                         "+",
-                        Value::Text("y".to_string()),
+                        Value::String("y".to_string()),
                     ));
                 } else {
                     panic!("function body stmt is not ExpressionStatement");
@@ -1213,7 +1208,8 @@ mod test {
         match expected {
             Value::Boolean(v) => _test_bool_literal(exp, v),
             Value::Integer(v) => _test_integer_literal(exp, v),
-            Value::Text(v) => _test_identifier(exp, &v),
+            Value::String(v) => _test_identifier(exp, &v),
+            _ => unreachable!(),
         }
     }
 

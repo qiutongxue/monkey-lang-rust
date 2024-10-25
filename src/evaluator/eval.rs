@@ -325,6 +325,10 @@ mod test {
         lexer::Lexer,
         object::{Environment, Object, FALSE, TRUE},
         parser::Parser,
+        test_utils::{
+            object::{test_boolean_object, test_integer_object, test_null_object, test_object},
+            Value,
+        },
     };
 
     use super::eval;
@@ -363,18 +367,6 @@ mod test {
         }
     }
 
-    fn test_integer_object(obj: &Object, expected: i64) {
-        if let Object::Integer(value) = obj {
-            assert_eq!(
-                *value, expected,
-                "object has wrong value. got={}, want={}",
-                value, expected
-            );
-        } else {
-            panic!("object is not Integer, got={obj:?}");
-        }
-    }
-
     #[test]
     fn test_eval_boolean_expression() {
         let tests = [
@@ -405,18 +397,6 @@ mod test {
         }
     }
 
-    fn test_boolean_object(obj: &Object, expected: bool) {
-        if let Object::Boolean(value) = obj {
-            assert_eq!(
-                *value, expected,
-                "object has wrong value. got={}, want={}",
-                value, expected
-            );
-        } else {
-            panic!("object is not Boolean");
-        }
-    }
-
     #[test]
     fn test_bang_operator() {
         let tests = [
@@ -431,33 +411,6 @@ mod test {
         for (input, expected) in tests {
             let evaluated = test_eval(input);
             test_boolean_object(&evaluated, expected);
-        }
-    }
-
-    #[derive(Debug)]
-    enum Value {
-        Integer(i64),
-        // Boolean(bool),
-        Null,
-        String(String),
-        Array(Vec<Value>),
-    }
-
-    impl From<i64> for Value {
-        fn from(i: i64) -> Self {
-            Value::Integer(i)
-        }
-    }
-
-    impl From<&str> for Value {
-        fn from(s: &str) -> Self {
-            Value::String(s.to_owned())
-        }
-    }
-
-    impl From<Vec<i64>> for Value {
-        fn from(arr: Vec<i64>) -> Self {
-            Self::Array(arr.into_iter().map(|i| i.into()).collect())
         }
     }
 
@@ -481,10 +434,6 @@ mod test {
                 test_null_object(&evaluated);
             }
         }
-    }
-
-    fn test_null_object(obj: &Object) {
-        assert!(matches!(obj, Object::Null), "object is not Null")
     }
 
     #[test]
@@ -705,42 +654,6 @@ mod test {
                     _ => panic!("object is not Error, got={:?}", evaluated),
                 },
                 value => test_object(&evaluated, &value),
-            }
-        }
-
-        fn test_array_object(obj: &Object, expected: &Vec<Value>) {
-            if let Object::Array(arr) = obj {
-                assert_eq!(
-                    arr.len(),
-                    expected.len(),
-                    "array has wrong length. got={}, want={}",
-                    arr.len(),
-                    expected.len()
-                );
-                for (i, obj) in arr.iter().enumerate() {
-                    test_object(obj, &expected[i]);
-                }
-            } else {
-                panic!("object is not Array. got={}", obj.get_type());
-            }
-        }
-
-        fn test_object(obj: &Object, expected: &Value) {
-            match expected {
-                Value::Integer(i) => test_integer_object(obj, *i),
-                Value::String(s) => match obj {
-                    Object::String(obj_s) => {
-                        assert_eq!(
-                            obj_s, s,
-                            "string has wrong value. got={}, want={}",
-                            obj_s, s
-                        )
-                    }
-                    _ => panic!("object is not String, got={:?}", obj),
-                },
-                Value::Null => test_null_object(obj),
-                Value::Array(arr) => test_array_object(obj, arr),
-                // _ => panic!("expected value is not supported, got={:?}", expected),
             }
         }
     }
