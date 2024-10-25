@@ -16,9 +16,14 @@ const PROMPT: &str = ">> ";
 
 use std::io::Write;
 
-use crate::{evaluator, lexer, object::Environment, parser};
+use crate::{compiler::Compiler, evaluator, lexer, object::Environment, parser, vm};
 
-pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
+pub enum Engine {
+    Eval,
+    VM,
+}
+
+pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout, engine: Engine) {
     println!("{MONKEY_FACE}");
     let env = Environment::new().to_rc();
 
@@ -33,10 +38,21 @@ pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
         let mut parser = parser::Parser::new(lexer);
 
         match parser.parse_program() {
-            Ok(program) => {
-                let evaluated = evaluator::eval(&program, env.clone());
-                println!("{}", evaluated.inspect());
-            }
+            Ok(program) => match engine {
+                Engine::Eval => {
+                    let evaluated = evaluator::eval(&program, env.clone());
+                    println!("{}", evaluated.inspect());
+                }
+                Engine::VM => {
+                    let mut comp = Compiler::new();
+                    comp.compile(&program).expect("Failed to compile program");
+                    let mut vm = vm::new(comp.byte_code());
+                    vm.run().expect("execute bytecode failed");
+
+                    let stack_top = vm.stack_top().unwrap();
+                    println!("{}", stack_top.inspect())
+                }
+            },
             Err(error) => eprintln!("{}", error),
         }
     }

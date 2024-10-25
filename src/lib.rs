@@ -7,6 +7,7 @@ pub mod object;
 pub mod parser;
 pub mod repl;
 pub mod token;
+pub mod vm;
 
 pub trait AsAny {
     fn as_any(&self) -> &dyn std::any::Any;
