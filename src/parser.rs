@@ -594,25 +594,10 @@ mod test {
 
     use core::panic;
 
-    use super::Parser;
     use crate::{
-        ast::{ExpressionEnum, Node, Program, StatementEnum},
-        lexer::Lexer,
-        test_utils::Value,
+        ast::{ExpressionEnum, Node, StatementEnum},
+        test_utils::{parse_program, Value},
     };
-
-    fn parse_program(input: &str) -> Program {
-        let l = Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = p.parse_program();
-        assert!(
-            program.is_ok(),
-            "parse_program() returned Error: {}",
-            program.err().unwrap()
-        );
-        program.unwrap()
-    }
 
     #[test]
     fn test_let_statement() {

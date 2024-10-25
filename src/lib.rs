@@ -56,6 +56,7 @@ macro_rules! impl_node_for_enum {
 
 #[cfg(test)]
 mod test_utils {
+
     #[derive(Debug)]
     pub enum Value {
         Integer(i64),
@@ -81,6 +82,12 @@ mod test_utils {
         fn from(arr: Vec<i64>) -> Self {
             Self::Array(arr.into_iter().map(|i| i.into()).collect())
         }
+    }
+
+    pub fn parse_program(input: &str) -> crate::ast::Program {
+        let l = crate::lexer::Lexer::new(input.to_string());
+        let mut p = crate::parser::Parser::new(l);
+        p.parse_program().expect("parse program error")
     }
 
     pub mod object {
