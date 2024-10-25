@@ -16,7 +16,7 @@ const PROMPT: &str = ">> ";
 
 use std::io::Write;
 
-use crate::{ast::NodeEnum, evaluator, lexer, object::Environment, parser};
+use crate::{evaluator, lexer, object::Environment, parser};
 
 pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
     println!("{MONKEY_FACE}");
@@ -34,7 +34,7 @@ pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout) {
 
         match parser.parse_program() {
             Ok(program) => {
-                let evaluated = evaluator::eval(NodeEnum::Program(program), env.clone());
+                let evaluated = evaluator::eval(&program, env.clone());
                 println!("{}", evaluated.inspect());
             }
             Err(error) => eprintln!("{}", error),

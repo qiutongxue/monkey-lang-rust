@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{
-        BlockStatement, ExpressionEnum, Identifier, IfExpression, NodeEnum, Program, StatementEnum,
-    },
+    ast::{BlockStatement, ExpressionEnum, Identifier, IfExpression, Program, StatementEnum},
     object::{Environment, Function, Object, RcEnvironment, FALSE, NULL, TRUE},
 };
 
@@ -35,13 +33,8 @@ impl From<EvalError> for Object {
     }
 }
 
-pub fn eval(node: NodeEnum, env: RcEnvironment) -> Object {
-    (match node {
-        NodeEnum::Program(p) => eval_programe(&p, env),
-        NodeEnum::StatementEnum(s) => eval_statement(&s, env),
-        NodeEnum::ExpressionEnum(e) => eval_expression(&e, env),
-    })
-    .unwrap_or_else(|error| error.into())
+pub fn eval(program: &Program, env: RcEnvironment) -> Object {
+    eval_programe(program, env).unwrap_or_else(|error| error.into())
 }
 
 fn eval_statement(stmt: &StatementEnum, env: RcEnvironment) -> Result<Object, EvalError> {
@@ -321,7 +314,6 @@ mod test {
     use std::collections::HashMap;
 
     use crate::{
-        ast::NodeEnum,
         lexer::Lexer,
         object::{Environment, Object, FALSE, TRUE},
         parser::Parser,
@@ -339,7 +331,7 @@ mod test {
         let program = p.parse_program().unwrap();
         let env = Environment::new().to_rc();
 
-        return eval(NodeEnum::Program(program), env);
+        return eval(&program, env);
     }
 
     #[test]

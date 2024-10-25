@@ -10,7 +10,7 @@ pub use expression::{
 };
 pub use statement::{ExpressionStatement, LetStatement, ReturnStatement, Statement, StatementEnum};
 
-use crate::{impl_as_any, impl_node_for_enum, AsAny};
+use crate::{impl_as_any, AsAny};
 
 impl_as_any!(
     Program,
@@ -27,20 +27,6 @@ impl_as_any!(
     FunctionLiteral,
     ExpressionStatement,
 );
-
-#[derive(Debug)]
-
-pub enum NodeEnum {
-    Program(Program),
-    StatementEnum(StatementEnum),
-    ExpressionEnum(ExpressionEnum),
-}
-
-impl_node_for_enum!(NodeEnum {
-    Program,
-    StatementEnum,
-    ExpressionEnum
-});
 
 pub trait Node: Display {
     fn token_literal(&self) -> String;
