@@ -91,6 +91,15 @@ impl Compiler {
                     "+" => {
                         self.emit(Opcode::Add, &[]);
                     }
+                    "-" => {
+                        self.emit(Opcode::Sub, &[]);
+                    }
+                    "*" => {
+                        self.emit(Opcode::Mul, &[]);
+                    }
+                    "/" => {
+                        self.emit(Opcode::Div, &[]);
+                    }
                     _ => return Err(CompileError::UnknownOperator(expr.operator.clone())),
                 }
                 Ok(())
@@ -209,6 +218,36 @@ mod tests {
                     make(Opcode::Pop, &[]),
                 ],
             ),
+            (
+                "1 - 2",
+                vec![1.into(), 2.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Sub, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "1 * 2",
+                vec![1.into(), 2.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Mul, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "2 / 1",
+                vec![2.into(), 1.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Div, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
         ]
         .into_iter()
         .map(|t| t.into())
@@ -223,11 +262,19 @@ mod tests {
             make(Opcode::Add, &[]),
             make(Opcode::Constant, &[2]),
             make(Opcode::Constant, &[65535]),
+            make(Opcode::Sub, &[]),
+            make(Opcode::Pop, &[]),
+            make(Opcode::Mul, &[]),
+            make(Opcode::Div, &[]),
         ];
 
         let expected = r#"0000 Add
 0001 Constant 2
 0004 Constant 65535
+0007 Sub
+0008 Pop
+0009 Mul
+0010 Div
 "#;
 
         let instructions = Instructions(instructions.iter().flatten().copied().collect::<Vec<_>>());

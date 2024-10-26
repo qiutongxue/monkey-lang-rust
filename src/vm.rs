@@ -41,14 +41,8 @@ impl VM {
                     ip += 2;
                     self.push(self.constants[const_index as usize].clone())?;
                 }
-                Opcode::Add => {
-                    let b = self.pop().unwrap();
-                    let a = self.pop().unwrap();
-                    let result = match (a, b) {
-                        (Object::Integer(a), Object::Integer(b)) => Object::Integer(a + b),
-                        _ => return Err(RuntimeError::MismachedTypes),
-                    };
-                    self.push(result)?;
+                Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
+                    self.execute_binary_operation(op)?
                 }
                 Opcode::Pop => {
                     self.pop();
@@ -56,6 +50,35 @@ impl VM {
             }
             ip += 1;
         }
+        Ok(())
+    }
+
+    fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), RuntimeError> {
+        let b = self.pop().unwrap();
+        let a = self.pop().unwrap();
+
+        match (a, b) {
+            (Object::Integer(a), Object::Integer(b)) => {
+                self.execute_binary_integer_operation(op, a, b)
+            }
+            _ => Err(RuntimeError::MismachedTypes),
+        }
+    }
+
+    fn execute_binary_integer_operation(
+        &mut self,
+        op: Opcode,
+        left: i64,
+        right: i64,
+    ) -> Result<(), RuntimeError> {
+        let result = match op {
+            Opcode::Add => left + right,
+            Opcode::Sub => left - right,
+            Opcode::Mul => left * right,
+            Opcode::Div => left / right,
+            _ => return Err(RuntimeError::InvalidOperation),
+        };
+        self.push(Object::Integer(result))?;
         Ok(())
     }
 
@@ -130,10 +153,23 @@ mod tests {
 
     #[test]
     fn test_integer_arithmetic() {
-        let tests = [("1", 1), ("2", 2), ("1 + 2", 3)]
-            .into_iter()
-            .map(VMTestCase::from)
-            .collect::<Vec<_>>();
+        let tests = [
+            ("1", 1),
+            ("2", 2),
+            ("1 + 2", 3),
+            ("1 - 2", -1),
+            ("2 * 3", 6),
+            ("4 / 2", 2),
+            ("50 / 2 * 2 + 10 - 5", 55),
+            ("5 + 5 + 5 + 5 - 10", 10),
+            ("2 * 3 + 4 * 5", 26),
+            ("5 / 2 * 2 + 1", 5),
+            ("5 * 2 + 10 / 2", 15),
+            ("5 * (2 + 10) / 2", 30),
+        ]
+        .into_iter()
+        .map(VMTestCase::from)
+        .collect::<Vec<_>>();
         run_vm_tests(&tests);
     }
 }

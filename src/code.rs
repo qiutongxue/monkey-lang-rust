@@ -53,10 +53,16 @@ impl From<Vec<u8>> for Instructions {
 pub enum Opcode {
     /// 数字常量 0~65535
     Constant = 0,
-    /// 数字加法
-    Add,
+    /// +
+    Add = 1,
+    /// -
+    Sub = 3,
+    /// *
+    Mul = 4,
+    /// /
+    Div = 5,
     /// 弹出
-    Pop,
+    Pop = 2,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -67,6 +73,9 @@ impl TryFrom<u8> for Opcode {
             0 => Ok(Opcode::Constant),
             1 => Ok(Opcode::Add),
             2 => Ok(Opcode::Pop),
+            3 => Ok(Opcode::Sub),
+            4 => Ok(Opcode::Mul),
+            5 => Ok(Opcode::Div),
             _ => Err(OpcodeError::InvalidOpcode(value)),
         }
     }
@@ -116,6 +125,27 @@ static DEFINITIONS: LazyLock<HashMap<Opcode, Definition>> = LazyLock::new(|| {
             Opcode::Pop,
             Definition {
                 name: "Pop",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
+        (
+            Opcode::Sub,
+            Definition {
+                name: "Sub",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
+        (
+            Opcode::Mul,
+            Definition {
+                name: "Mul",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
+        (
+            Opcode::Div,
+            Definition {
+                name: "Div",
                 operand_width: vec![], // 没有操作数
             },
         ),
@@ -191,6 +221,9 @@ mod tests {
             ),
             (Opcode::Add, vec![], vec![Opcode::Add as u8]),
             (Opcode::Pop, vec![], vec![Opcode::Pop as u8]),
+            (Opcode::Sub, vec![], vec![Opcode::Sub as u8]),
+            (Opcode::Mul, vec![], vec![Opcode::Mul as u8]),
+            (Opcode::Div, vec![], vec![Opcode::Div as u8]),
         ];
         for (op, operands, expected) in tests {
             let instruction = make(op, &operands);
