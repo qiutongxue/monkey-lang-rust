@@ -67,7 +67,10 @@ impl Compiler {
             StatementEnum::LetStatement(_) => todo!(),
             StatementEnum::ReturnStatement(_) => todo!(),
             StatementEnum::ExpressionStatement(expr_stmt) => {
-                self.compile_expr(&expr_stmt.expression)
+                self.compile_expr(&expr_stmt.expression)?;
+                // 每次用完表达式，把值弹出栈（因为已经没用了）
+                self.emit(Opcode::Pop, &[]);
+                Ok(())
             }
         }
     }
@@ -185,15 +188,28 @@ mod tests {
 
     #[test]
     fn test_integer_arithmetic() {
-        let tests: Vec<CompilerTestCase> = vec![(
-            "1 + 2",
-            vec![1.into(), 2.into()],
-            vec![
-                make(Opcode::Constant, &[0]),
-                make(Opcode::Constant, &[1]),
-                make(Opcode::Add, &[]),
-            ],
-        )]
+        let tests: Vec<CompilerTestCase> = vec![
+            (
+                "1 + 2",
+                vec![1.into(), 2.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Add, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "1; 2",
+                vec![1.into(), 2.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Pop, &[]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+        ]
         .into_iter()
         .map(|t| t.into())
         .collect();

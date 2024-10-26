@@ -49,7 +49,7 @@ pub fn start(stdin: std::io::Stdin, mut out: std::io::Stdout, engine: Engine) {
                     let mut vm = vm::new(comp.byte_code());
                     vm.run().expect("execute bytecode failed");
 
-                    let stack_top = vm.stack_top().unwrap();
+                    let stack_top = vm.last_popped_elem().unwrap();
                     println!("{}", stack_top.inspect())
                 }
             },

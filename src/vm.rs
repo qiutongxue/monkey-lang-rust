@@ -20,13 +20,13 @@ pub enum RuntimeError {
 pub struct VM {
     constants: Vec<Object>,
     instructions: Instructions,
-
-    stack: Vec<Object>,
+    stack: Vec<Option<Object>>,
+    sp: usize,
 }
 
 impl VM {
     pub fn stack_top(&self) -> Option<&Object> {
-        self.stack.last()
+        self.stack.last().and_then(|x| x.as_ref())
     }
 
     pub fn run(&mut self) -> Result<(), RuntimeError> {
@@ -50,6 +50,9 @@ impl VM {
                     };
                     self.push(result)?;
                 }
+                Opcode::Pop => {
+                    self.pop();
+                }
             }
             ip += 1;
         }
@@ -57,15 +60,24 @@ impl VM {
     }
 
     pub fn push(&mut self, obj: Object) -> Result<(), RuntimeError> {
-        if self.stack.len() >= STACK_SIZE {
+        if self.sp >= STACK_SIZE {
             return Err(RuntimeError::StackOverflow);
         }
-        self.stack.push(obj);
+        self.stack[self.sp] = Some(obj);
+        self.sp += 1;
         Ok(())
     }
 
     pub fn pop(&mut self) -> Option<Object> {
-        self.stack.pop()
+        if self.sp == 0 {
+            return None;
+        }
+        self.sp -= 1;
+        self.stack[self.sp].clone()
+    }
+
+    pub fn last_popped_elem(&self) -> Option<&Object> {
+        self.stack[self.sp].as_ref()
     }
 }
 
@@ -73,7 +85,8 @@ pub fn new(bytecode: Bytecode) -> VM {
     VM {
         constants: bytecode.constants,
         instructions: bytecode.instructions,
-        stack: Vec::with_capacity(STACK_SIZE),
+        stack: vec![None; STACK_SIZE],
+        sp: 0,
     }
 }
 
@@ -109,7 +122,7 @@ mod tests {
             let mut vm = new(comp.byte_code());
             vm.run().expect("run error");
 
-            let stack_elem = vm.stack_top().expect("empty stack");
+            let stack_elem = vm.last_popped_elem().expect("empty stack");
 
             test_object(stack_elem, expected);
         }

@@ -53,7 +53,10 @@ impl From<Vec<u8>> for Instructions {
 pub enum Opcode {
     /// 数字常量 0~65535
     Constant = 0,
+    /// 数字加法
     Add,
+    /// 弹出
+    Pop,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -63,6 +66,7 @@ impl TryFrom<u8> for Opcode {
         match value {
             0 => Ok(Opcode::Constant),
             1 => Ok(Opcode::Add),
+            2 => Ok(Opcode::Pop),
             _ => Err(OpcodeError::InvalidOpcode(value)),
         }
     }
@@ -108,6 +112,13 @@ static DEFINITIONS: LazyLock<HashMap<Opcode, Definition>> = LazyLock::new(|| {
                 operand_width: vec![], // 没有操作数
             },
         ),
+        (
+            Opcode::Pop,
+            Definition {
+                name: "Pop",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
     ])
 });
 
@@ -118,25 +129,28 @@ pub fn lookup<'a>(op: u8) -> Result<&'a Definition, OpcodeError> {
 
 /// 生成指令
 pub fn make(op: Opcode, operands: &[i32]) -> Vec<u8> {
-    DEFINITIONS.get(&op).map_or(vec![], |def| {
-        let mut instruction_length = 1; // 初始操作码长度为 1
-        for &w in &def.operand_width {
-            instruction_length += w; // 操作数长度加上操作码长度
-        }
-        let mut instruction = vec![0; instruction_length];
-        instruction[0] = op as u8;
-
-        let mut offset = 1;
-        for (i, o) in operands.iter().enumerate() {
-            let width = def.operand_width[i];
-            match width {
-                2 => write_u16(&mut instruction[offset..], *o as u16),
-                _ => unimplemented!(),
+    DEFINITIONS
+        .get(&op)
+        .map(|def| {
+            let mut instruction_length = 1; // 初始操作码长度为 1
+            for &w in &def.operand_width {
+                instruction_length += w; // 操作数长度加上操作码长度
             }
-            offset += width;
-        }
-        instruction
-    })
+            let mut instruction = vec![0; instruction_length];
+            instruction[0] = op as u8;
+
+            let mut offset = 1;
+            for (i, o) in operands.iter().enumerate() {
+                let width = def.operand_width[i];
+                match width {
+                    2 => write_u16(&mut instruction[offset..], *o as u16),
+                    _ => unimplemented!(),
+                }
+                offset += width;
+            }
+            instruction
+        })
+        .expect("missing definition for opcode")
 }
 
 pub fn read_operands(def: &Definition, instruction: &[u8]) -> (Vec<i32>, usize) {
@@ -176,6 +190,7 @@ mod tests {
                 vec![Opcode::Constant as u8, 0xff, 0xfe],
             ),
             (Opcode::Add, vec![], vec![Opcode::Add as u8]),
+            (Opcode::Pop, vec![], vec![Opcode::Pop as u8]),
         ];
         for (op, operands, expected) in tests {
             let instruction = make(op, &operands);
