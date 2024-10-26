@@ -57,7 +57,7 @@ impl VM {
     }
 
     pub fn push(&mut self, obj: Object) -> Result<(), RuntimeError> {
-        if self.stack.len() > STACK_SIZE {
+        if self.stack.len() >= STACK_SIZE {
             return Err(RuntimeError::StackOverflow);
         }
         self.stack.push(obj);
