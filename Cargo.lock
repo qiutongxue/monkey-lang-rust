@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "monkey-interpreter-rust"
+name = "monkey-lang-rust"
 version = "0.1.0"
