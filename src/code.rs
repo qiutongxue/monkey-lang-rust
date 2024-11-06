@@ -55,18 +55,24 @@ pub enum Opcode {
     Constant = 0,
     /// +
     Add = 1,
+    /// 弹出
+    Pop = 2,
     /// -
     Sub = 3,
     /// *
     Mul = 4,
     /// /
     Div = 5,
-    /// 弹出
-    Pop = 2,
     /// 布尔值 true
     True = 6,
     /// 布尔值 false
     False = 7,
+    /// ==
+    Equal = 8,
+    ///!=
+    NotEqual = 9,
+    /// `>`（包括 `<`）
+    GreaterThan = 10,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -82,6 +88,9 @@ impl TryFrom<u8> for Opcode {
             5 => Ok(Opcode::Div),
             6 => Ok(Opcode::True),
             7 => Ok(Opcode::False),
+            8 => Ok(Opcode::Equal),
+            9 => Ok(Opcode::NotEqual),
+            10 => Ok(Opcode::GreaterThan),
             _ => Err(OpcodeError::InvalidOpcode(value)),
         }
     }
@@ -166,6 +175,27 @@ static DEFINITIONS: LazyLock<HashMap<Opcode, Definition>> = LazyLock::new(|| {
             Opcode::False,
             Definition {
                 name: "False",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
+        (
+            Opcode::Equal,
+            Definition {
+                name: "Equal",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
+        (
+            Opcode::NotEqual,
+            Definition {
+                name: "NotEqual",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
+        (
+            Opcode::GreaterThan,
+            Definition {
+                name: "GreaterThan",
                 operand_width: vec![], // 没有操作数
             },
         ),

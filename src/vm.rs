@@ -55,6 +55,12 @@ impl VM {
                 Opcode::False => {
                     self.push(FALSE)?;
                 }
+                Opcode::Equal | Opcode::NotEqual | Opcode::GreaterThan => {
+                    self.execute_comparison(op)?
+                }
+                _ => {
+                    todo!()
+                }
             }
             ip += 1;
         }
@@ -69,6 +75,28 @@ impl VM {
             (Object::Integer(a), Object::Integer(b)) => {
                 self.execute_binary_integer_operation(op, a, b)
             }
+            _ => Err(RuntimeError::MismachedTypes),
+        }
+    }
+
+    fn execute_comparison(&mut self, op: Opcode) -> Result<(), RuntimeError> {
+        let right = self.pop().unwrap();
+        let left = self.pop().unwrap();
+        match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => {
+                let result = match op {
+                    Opcode::Equal => left == right,
+                    Opcode::NotEqual => left != right,
+                    Opcode::GreaterThan => left > right,
+                    _ => return Err(RuntimeError::InvalidOperation),
+                };
+                self.push(Object::Boolean(result))
+            }
+            (Object::Boolean(left), Object::Boolean(right)) => match op {
+                Opcode::Equal => self.push(Object::Boolean(left == right)),
+                Opcode::NotEqual => self.push(Object::Boolean(left != right)),
+                _ => Err(RuntimeError::InvalidOperation),
+            },
             _ => Err(RuntimeError::MismachedTypes),
         }
     }
@@ -192,10 +220,36 @@ mod tests {
 
     #[test]
     fn test_boolean_expression() {
-        let tests = [("true", true), ("false", false)]
-            .into_iter()
-            .map(VMTestCase::from)
-            .collect::<Vec<_>>();
+        let tests = [
+            ("true", true),
+            ("false", false),
+            ("1 < 2", true),
+            ("1 > 2", false),
+            ("1 < 1", false),
+            ("1 > 1", false),
+            ("1 == 1", true),
+            ("1 != 1", false),
+            ("1 == 2", false),
+            ("1 != 2", true),
+            ("true == true", true),
+            ("false == false", true),
+            ("true == false", false),
+            ("(1 < 2) == true", true),
+            ("(1 < 2) == false", false),
+            ("(1 > 2) == true", false),
+            ("(1 > 2) == false", true),
+            // ("!true", false),
+            // ("!false", true),
+            // ("!5", false),
+            // ("!!true", true),
+            // ("!!false", false),
+            // ("!!5", true),
+            // ("true && true", true),
+            // ("true && false", false),
+        ]
+        .into_iter()
+        .map(VMTestCase::from)
+        .collect::<Vec<_>>();
         run_vm_tests(&tests);
     }
 }

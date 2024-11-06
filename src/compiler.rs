@@ -85,6 +85,13 @@ impl Compiler {
                 Ok(())
             }
             ExpressionEnum::InfixExpression(expr) => {
+                // 翻转
+                if expr.operator.as_str() == "<" {
+                    self.compile_expr(&expr.right)?;
+                    self.compile_expr(&expr.left)?;
+                    self.emit(Opcode::GreaterThan, &[]);
+                    return Ok(());
+                }
                 self.compile_expr(&expr.left)?;
                 self.compile_expr(&expr.right)?;
                 match expr.operator.as_str() {
@@ -99,6 +106,15 @@ impl Compiler {
                     }
                     "/" => {
                         self.emit(Opcode::Div, &[]);
+                    }
+                    "==" => {
+                        self.emit(Opcode::Equal, &[]);
+                    }
+                    "!=" => {
+                        self.emit(Opcode::NotEqual, &[]);
+                    }
+                    ">" => {
+                        self.emit(Opcode::GreaterThan, &[]);
                     }
                     _ => return Err(CompileError::UnknownOperator(expr.operator.clone())),
                 }
@@ -256,6 +272,26 @@ mod tests {
                     make(Opcode::Pop, &[]),
                 ],
             ),
+            (
+                "true == false",
+                vec![],
+                vec![
+                    make(Opcode::True, &[]),
+                    make(Opcode::False, &[]),
+                    make(Opcode::Equal, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "true != false",
+                vec![],
+                vec![
+                    make(Opcode::True, &[]),
+                    make(Opcode::False, &[]),
+                    make(Opcode::NotEqual, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
         ]
         .into_iter()
         .map(|t| t.into())
@@ -301,6 +337,46 @@ mod tests {
                 "false",
                 vec![],
                 vec![make(Opcode::False, &[]), make(Opcode::Pop, &[])],
+            ),
+            (
+                "1 > 2",
+                vec![1.into(), 2.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::GreaterThan, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "1 == 2",
+                vec![1.into(), 2.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Equal, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "1 != 2",
+                vec![1.into(), 2.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::NotEqual, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "1 < 2",
+                vec![2.into(), 1.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::GreaterThan, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
             ),
         ]
         .into_iter()
