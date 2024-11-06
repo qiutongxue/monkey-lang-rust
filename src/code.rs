@@ -63,6 +63,10 @@ pub enum Opcode {
     Div = 5,
     /// 弹出
     Pop = 2,
+    /// 布尔值 true
+    True = 6,
+    /// 布尔值 false
+    False = 7,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -76,6 +80,8 @@ impl TryFrom<u8> for Opcode {
             3 => Ok(Opcode::Sub),
             4 => Ok(Opcode::Mul),
             5 => Ok(Opcode::Div),
+            6 => Ok(Opcode::True),
+            7 => Ok(Opcode::False),
             _ => Err(OpcodeError::InvalidOpcode(value)),
         }
     }
@@ -146,6 +152,20 @@ static DEFINITIONS: LazyLock<HashMap<Opcode, Definition>> = LazyLock::new(|| {
             Opcode::Div,
             Definition {
                 name: "Div",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
+        (
+            Opcode::True,
+            Definition {
+                name: "True",
+                operand_width: vec![], // 没有操作数
+            },
+        ),
+        (
+            Opcode::False,
+            Definition {
+                name: "False",
                 operand_width: vec![], // 没有操作数
             },
         ),

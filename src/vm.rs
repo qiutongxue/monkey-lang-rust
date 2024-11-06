@@ -7,6 +7,8 @@ use crate::{
 };
 
 const STACK_SIZE: usize = 2048;
+const TRUE: Object = Object::Boolean(true);
+const FALSE: Object = Object::Boolean(false);
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -46,6 +48,12 @@ impl VM {
                 }
                 Opcode::Pop => {
                     self.pop();
+                }
+                Opcode::True => {
+                    self.push(TRUE)?;
+                }
+                Opcode::False => {
+                    self.push(FALSE)?;
                 }
             }
             ip += 1;
@@ -136,6 +144,15 @@ mod tests {
         }
     }
 
+    impl From<(&str, bool)> for VMTestCase {
+        fn from(t: (&str, bool)) -> Self {
+            Self {
+                input: t.0.to_string(),
+                expected: Value::Boolean(t.1),
+            }
+        }
+    }
+
     fn run_vm_tests(tests: &[VMTestCase]) {
         for VMTestCase { input, expected } in tests {
             let program = crate::test_utils::parse_program(&input);
@@ -170,6 +187,15 @@ mod tests {
         .into_iter()
         .map(VMTestCase::from)
         .collect::<Vec<_>>();
+        run_vm_tests(&tests);
+    }
+
+    #[test]
+    fn test_boolean_expression() {
+        let tests = [("true", true), ("false", false)]
+            .into_iter()
+            .map(VMTestCase::from)
+            .collect::<Vec<_>>();
         run_vm_tests(&tests);
     }
 }

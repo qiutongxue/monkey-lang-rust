@@ -104,6 +104,14 @@ impl Compiler {
                 }
                 Ok(())
             }
+            ExpressionEnum::Boolean(b) => {
+                if b.value {
+                    self.emit(Opcode::True, &[]);
+                } else {
+                    self.emit(Opcode::False, &[]);
+                }
+                Ok(())
+            }
             ExpressionEnum::Identifier(_) => todo!(),
             ExpressionEnum::PrefixExpression(_) => todo!(),
             _ => unreachable!(),
@@ -279,5 +287,25 @@ mod tests {
 
         let instructions = Instructions(instructions.iter().flatten().copied().collect::<Vec<_>>());
         assert_eq!(expected, format!("{}", instructions));
+    }
+
+    #[test]
+    fn test_boolean_expression() {
+        let tests: Vec<CompilerTestCase> = vec![
+            (
+                "true",
+                vec![],
+                vec![make(Opcode::True, &[]), make(Opcode::Pop, &[])],
+            ),
+            (
+                "false",
+                vec![],
+                vec![make(Opcode::False, &[]), make(Opcode::Pop, &[])],
+            ),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect();
+        run_compiler_test(&tests);
     }
 }
