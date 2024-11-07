@@ -50,7 +50,8 @@ impl From<Vec<u8>> for Instructions {
 
 macro_rules! define_opcode {
     ($(
-        $opcode:ident = $value:expr, $name:expr, $width:expr,    )*) => {
+        $opcode:ident = $value:expr, $name:expr, $width:expr,
+    )*) => {
         #[repr(u8)]
         #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
         pub enum Opcode {
