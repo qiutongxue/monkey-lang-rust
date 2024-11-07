@@ -48,52 +48,52 @@ impl From<Vec<u8>> for Instructions {
     }
 }
 
-#[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum Opcode {
-    /// 数字常量 0~65535
-    Constant = 0,
-    /// +
-    Add = 1,
-    /// 弹出
-    Pop = 2,
-    /// -
-    Sub = 3,
-    /// *
-    Mul = 4,
-    /// /
-    Div = 5,
-    /// 布尔值 true
-    True = 6,
-    /// 布尔值 false
-    False = 7,
-    /// ==
-    Equal = 8,
-    ///!=
-    NotEqual = 9,
-    /// `>`（包括 `<`）
-    GreaterThan = 10,
+macro_rules! define_opcode {
+    ($(
+        $opcode:ident = $value:expr, $name:expr, $width:expr,    )*) => {
+        #[repr(u8)]
+        #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+        pub enum Opcode {
+            $($opcode = $value,)*
+        }
+
+        impl TryFrom<u8> for Opcode {
+            type Error = OpcodeError;
+
+            fn try_from(value: u8) -> Result<Self, Self::Error> {
+                match value {
+                    $($value => Ok(Opcode::$opcode),)*
+                    _ => Err(OpcodeError::InvalidOpcode(value)),
+                }
+            }
+        }
+
+        static DEFINITIONS: LazyLock<HashMap<Opcode, Definition>> = LazyLock::new(|| {
+            HashMap::from([
+                $((
+                    Opcode::$opcode,
+                    Definition {
+                        name: $name,
+                        operand_width: $width,
+                    },
+                ),)*
+            ])
+        });
+    };
 }
 
-impl TryFrom<u8> for Opcode {
-    type Error = OpcodeError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Opcode::Constant),
-            1 => Ok(Opcode::Add),
-            2 => Ok(Opcode::Pop),
-            3 => Ok(Opcode::Sub),
-            4 => Ok(Opcode::Mul),
-            5 => Ok(Opcode::Div),
-            6 => Ok(Opcode::True),
-            7 => Ok(Opcode::False),
-            8 => Ok(Opcode::Equal),
-            9 => Ok(Opcode::NotEqual),
-            10 => Ok(Opcode::GreaterThan),
-            _ => Err(OpcodeError::InvalidOpcode(value)),
-        }
-    }
+define_opcode! {
+    Constant = 0, "Constant", vec![2],
+    Add = 1, "Add", vec![],
+    Pop = 2, "Pop", vec![],
+    Sub = 3, "Sub", vec![],
+    Mul = 4, "Mul", vec![],
+    Div = 5, "Div", vec![],
+    True = 6, "True", vec![],
+    False = 7, "False", vec![],
+    Equal = 8, "Equal", vec![],
+    NotEqual = 9, "NotEqual", vec![],
+    GreaterThan = 10, "GreaterThan", vec![],
 }
 
 #[derive(Debug)]
@@ -119,88 +119,6 @@ pub struct Definition {
     /// 操作数的长度，为什么是 Vec 呢，因为操作数可能不止一个
     operand_width: Vec<usize>,
 }
-
-static DEFINITIONS: LazyLock<HashMap<Opcode, Definition>> = LazyLock::new(|| {
-    HashMap::from([
-        (
-            Opcode::Constant,
-            Definition {
-                name: "Constant",
-                operand_width: vec![2], // 只有一个操作数，长度为 2 字节
-            },
-        ),
-        (
-            Opcode::Add,
-            Definition {
-                name: "Add",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::Pop,
-            Definition {
-                name: "Pop",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::Sub,
-            Definition {
-                name: "Sub",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::Mul,
-            Definition {
-                name: "Mul",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::Div,
-            Definition {
-                name: "Div",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::True,
-            Definition {
-                name: "True",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::False,
-            Definition {
-                name: "False",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::Equal,
-            Definition {
-                name: "Equal",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::NotEqual,
-            Definition {
-                name: "NotEqual",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-        (
-            Opcode::GreaterThan,
-            Definition {
-                name: "GreaterThan",
-                operand_width: vec![], // 没有操作数
-            },
-        ),
-    ])
-});
 
 pub fn lookup<'a>(op: u8) -> Result<&'a Definition, OpcodeError> {
     let opcode = op.try_into()?;
