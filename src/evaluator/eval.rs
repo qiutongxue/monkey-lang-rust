@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{BlockStatement, ExpressionEnum, Identifier, IfExpression, Program, StatementEnum},
-    object::{Environment, Function, Object, RcEnvironment, FALSE, NULL, TRUE},
+    object::{Environment, Function, Object, RcEnvironment, NULL},
 };
 
 use super::builtin::BUILTINS;
@@ -64,8 +64,8 @@ fn eval_statement(stmt: &StatementEnum, env: RcEnvironment) -> Result<Object, Ev
 
 fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, EvalError> {
     match exp {
-        ExpressionEnum::IntegerLiteral(il) => Ok(Object::Integer(il.value)),
-        ExpressionEnum::Boolean(b) => Ok(native_bool_to_boolean_object(b.value)),
+        ExpressionEnum::IntegerLiteral(il) => Ok(Object::from(il.value)),
+        ExpressionEnum::Boolean(b) => Ok(Object::from(b.value)),
         ExpressionEnum::PrefixExpression(pe) => {
             let right = eval_expression(pe.right.as_ref(), env)?;
             eval_prefix_expression(pe.operator.as_str(), right)
@@ -92,7 +92,7 @@ fn eval_expression(exp: &ExpressionEnum, env: RcEnvironment) -> Result<Object, E
             apply_function(&function, args)
         }
         ExpressionEnum::BlockStatement(bs) => eval_block_statement(bs, env),
-        ExpressionEnum::StringLiteral(sl) => Ok(Object::String(sl.value.to_owned())),
+        ExpressionEnum::StringLiteral(sl) => Ok(Object::from(sl.value.as_str())),
         ExpressionEnum::ArrayLiteral(al) => {
             let elements = eval_expressions(&al.elements, env)?;
             Ok(Object::Array(elements))
@@ -218,15 +218,15 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Result<
             eval_integer_infix_expression(operator, *left_value, *right_value)
         }
         (Object::Boolean(left_value), Object::Boolean(right_value)) => match operator {
-            "==" => Ok(native_bool_to_boolean_object(left_value == right_value)),
-            "!=" => Ok(native_bool_to_boolean_object(left_value != right_value)),
+            "==" => Ok(Object::from(left_value == right_value)),
+            "!=" => Ok(Object::from(left_value != right_value)),
             _ => Err(EvalError::UnknownOperator(format!(
                 "BOOLEAN {} BOOLEAN",
                 operator,
             ))),
         },
         (Object::String(left_value), Object::String(right_value)) => match operator {
-            "+" => Ok(Object::String(left_value.to_owned() + right_value)),
+            "+" => Ok(Object::from(left_value.to_owned() + right_value)),
             _ => Err(EvalError::UnknownOperator(format!(
                 "STRING {} STRING",
                 operator,
@@ -247,14 +247,14 @@ fn eval_integer_infix_expression(
     right_value: i64,
 ) -> Result<Object, EvalError> {
     match operator {
-        "+" => Ok(Object::Integer(left_value + right_value)),
-        "-" => Ok(Object::Integer(left_value - right_value)),
-        "*" => Ok(Object::Integer(left_value * right_value)),
-        "/" => Ok(Object::Integer(left_value / right_value)),
-        "<" => Ok(native_bool_to_boolean_object(left_value < right_value)),
-        ">" => Ok(native_bool_to_boolean_object(left_value > right_value)),
-        "==" => Ok(native_bool_to_boolean_object(left_value == right_value)),
-        "!=" => Ok(native_bool_to_boolean_object(left_value != right_value)),
+        "+" => Ok(Object::from(left_value + right_value)),
+        "-" => Ok(Object::from(left_value - right_value)),
+        "*" => Ok(Object::from(left_value * right_value)),
+        "/" => Ok(Object::from(left_value / right_value)),
+        "<" => Ok(Object::from(left_value < right_value)),
+        ">" => Ok(Object::from(left_value > right_value)),
+        "==" => Ok(Object::from(left_value == right_value)),
+        "!=" => Ok(Object::from(left_value != right_value)),
         _ => Err(EvalError::UnknownOperator(format!(
             "INTEGER {} INTEGER",
             operator,
@@ -275,12 +275,12 @@ fn eval_prefix_expression(operator: &str, right: Object) -> Result<Object, EvalE
 }
 
 fn eval_bang_operator_expression(right: Object) -> Object {
-    native_bool_to_boolean_object(!right.is_truthy())
+    Object::from(!right.is_truthy())
 }
 
 fn eval_minus_prefix_operator_expression(right: Object) -> Result<Object, EvalError> {
     if let Object::Integer(i) = right {
-        Ok(Object::Integer(-i))
+        Ok(Object::from(-i))
     } else {
         Err(EvalError::UnknownOperator(format!("-{}", right.get_type())))
     }
@@ -298,14 +298,6 @@ fn eval_if_expression(ie: &IfExpression, env: RcEnvironment) -> Result<Object, E
         )
     } else {
         Ok(NULL)
-    }
-}
-
-fn native_bool_to_boolean_object(input: bool) -> Object {
-    if input {
-        TRUE
-    } else {
-        FALSE
     }
 }
 

@@ -124,6 +124,34 @@ impl Object {
     }
 }
 
+impl From<i64> for Object {
+    fn from(value: i64) -> Self {
+        Object::Integer(value)
+    }
+}
+
+impl From<bool> for Object {
+    fn from(value: bool) -> Self {
+        if value {
+            TRUE
+        } else {
+            FALSE
+        }
+    }
+}
+
+impl From<String> for Object {
+    fn from(value: String) -> Self {
+        Object::String(value)
+    }
+}
+
+impl From<&str> for Object {
+    fn from(value: &str) -> Self {
+        Object::String(value.to_string())
+    }
+}
+
 pub type RcEnvironment = Rc<RefCell<Environment>>;
 
 #[derive(Debug)]

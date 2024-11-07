@@ -3,12 +3,10 @@ use std::error::Error;
 use crate::{
     code::{read_u16, Instructions, Opcode},
     compiler::Bytecode,
-    object::Object,
+    object::{Object, FALSE, TRUE},
 };
 
 const STACK_SIZE: usize = 2048;
-const TRUE: Object = Object::Boolean(true);
-const FALSE: Object = Object::Boolean(false);
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -90,11 +88,11 @@ impl VM {
                     Opcode::GreaterThan => left > right,
                     _ => return Err(RuntimeError::InvalidOperation),
                 };
-                self.push(Object::Boolean(result))
+                self.push(Object::from(result))
             }
             (Object::Boolean(left), Object::Boolean(right)) => match op {
-                Opcode::Equal => self.push(Object::Boolean(left == right)),
-                Opcode::NotEqual => self.push(Object::Boolean(left != right)),
+                Opcode::Equal => self.push(Object::from(left == right)),
+                Opcode::NotEqual => self.push(Object::from(left != right)),
                 _ => Err(RuntimeError::InvalidOperation),
             },
             _ => Err(RuntimeError::MismachedTypes),
@@ -114,7 +112,7 @@ impl VM {
             Opcode::Div => left / right,
             _ => return Err(RuntimeError::InvalidOperation),
         };
-        self.push(Object::Integer(result))?;
+        self.push(result.into())?;
         Ok(())
     }
 
