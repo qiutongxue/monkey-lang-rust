@@ -56,9 +56,15 @@ impl VM {
                 Opcode::Equal | Opcode::NotEqual | Opcode::GreaterThan => {
                     self.execute_comparison(op)?
                 }
-                _ => {
-                    todo!()
+                Opcode::Bang => {
+                    let operand = self.pop().unwrap();
+                    let result = Object::from(!operand.is_truthy());
+                    self.push(result)?;
                 }
+                Opcode::Minus => match self.pop().unwrap() {
+                    Object::Integer(n) => self.push(Object::from(-n))?,
+                    _ => return Err(RuntimeError::InvalidOperation),
+                },
             }
             ip += 1;
         }
@@ -209,6 +215,11 @@ mod tests {
             ("5 / 2 * 2 + 1", 5),
             ("5 * 2 + 10 / 2", 15),
             ("5 * (2 + 10) / 2", 30),
+            ("-5", -5),
+            ("-10 + 15", 5),
+            ("-50 + 100 + -50", 0),
+            ("5 * -5", -25),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
         ]
         .into_iter()
         .map(VMTestCase::from)
@@ -236,12 +247,12 @@ mod tests {
             ("(1 < 2) == false", false),
             ("(1 > 2) == true", false),
             ("(1 > 2) == false", true),
-            // ("!true", false),
-            // ("!false", true),
-            // ("!5", false),
-            // ("!!true", true),
-            // ("!!false", false),
-            // ("!!5", true),
+            ("!true", false),
+            ("!false", true),
+            ("!5", false),
+            ("!!true", true),
+            ("!!false", false),
+            ("!!5", true),
             // ("true && true", true),
             // ("true && false", false),
         ]

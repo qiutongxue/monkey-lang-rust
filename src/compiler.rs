@@ -84,6 +84,19 @@ impl Compiler {
                 self.emit(Opcode::Constant, &[index]);
                 Ok(())
             }
+            ExpressionEnum::PrefixExpression(expr) => {
+                self.compile_expr(&expr.right)?;
+                match expr.operator.as_str() {
+                    "!" => {
+                        self.emit(Opcode::Bang, &[]);
+                    }
+                    "-" => {
+                        self.emit(Opcode::Minus, &[]);
+                    }
+                    _ => return Err(CompileError::UnknownOperator(expr.operator.clone())),
+                }
+                Ok(())
+            }
             ExpressionEnum::InfixExpression(expr) => {
                 // 翻转
                 if expr.operator.as_str() == "<" {
@@ -129,7 +142,6 @@ impl Compiler {
                 Ok(())
             }
             ExpressionEnum::Identifier(_) => todo!(),
-            ExpressionEnum::PrefixExpression(_) => todo!(),
             _ => unreachable!(),
         }
     }
@@ -273,22 +285,11 @@ mod tests {
                 ],
             ),
             (
-                "true == false",
-                vec![],
+                "-1",
+                vec![1.into()],
                 vec![
-                    make(Opcode::True, &[]),
-                    make(Opcode::False, &[]),
-                    make(Opcode::Equal, &[]),
-                    make(Opcode::Pop, &[]),
-                ],
-            ),
-            (
-                "true != false",
-                vec![],
-                vec![
-                    make(Opcode::True, &[]),
-                    make(Opcode::False, &[]),
-                    make(Opcode::NotEqual, &[]),
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Minus, &[]),
                     make(Opcode::Pop, &[]),
                 ],
             ),
@@ -375,6 +376,35 @@ mod tests {
                     make(Opcode::Constant, &[0]),
                     make(Opcode::Constant, &[1]),
                     make(Opcode::GreaterThan, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "true == false",
+                vec![],
+                vec![
+                    make(Opcode::True, &[]),
+                    make(Opcode::False, &[]),
+                    make(Opcode::Equal, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "true != false",
+                vec![],
+                vec![
+                    make(Opcode::True, &[]),
+                    make(Opcode::False, &[]),
+                    make(Opcode::NotEqual, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "!true",
+                vec![],
+                vec![
+                    make(Opcode::True, &[]),
+                    make(Opcode::Bang, &[]),
                     make(Opcode::Pop, &[]),
                 ],
             ),
