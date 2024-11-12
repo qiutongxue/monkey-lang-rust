@@ -96,7 +96,10 @@ define_opcode! {
     NotEqual = 9, "NotEqual", vec![],
     GreaterThan = 10, "GreaterThan", vec![],
     Minus = 11, "Minus", vec![],
-    Bang   = 12, "Bang", vec![],
+    Bang = 12, "Bang", vec![],
+    JumpNotTruthy = 13, "JumpNotTruthy", vec![2],
+    Jump = 14, "Jump", vec![2],
+    Null = 15, "Null", vec![],
 }
 
 #[derive(Debug)]

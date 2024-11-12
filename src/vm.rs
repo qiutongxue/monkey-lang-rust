@@ -3,7 +3,7 @@ use std::error::Error;
 use crate::{
     code::{read_u16, Instructions, Opcode},
     compiler::Bytecode,
-    object::{Object, FALSE, TRUE},
+    object::{Object, FALSE, NULL, TRUE},
 };
 
 const STACK_SIZE: usize = 2048;
@@ -53,6 +53,9 @@ impl VM {
                 Opcode::False => {
                     self.push(FALSE)?;
                 }
+                Opcode::Null => {
+                    self.push(NULL)?;
+                }
                 Opcode::Equal | Opcode::NotEqual | Opcode::GreaterThan => {
                     self.execute_comparison(op)?
                 }
@@ -65,6 +68,19 @@ impl VM {
                     Object::Integer(n) => self.push(Object::from(-n))?,
                     _ => return Err(RuntimeError::InvalidOperation),
                 },
+                Opcode::JumpNotTruthy => {
+                    let is_truthy = self.pop().map_or(false, |obj| obj.is_truthy());
+                    if !is_truthy {
+                        let jump_offset = read_u16(&self.instructions.0[ip + 1..]);
+                        ip = jump_offset as usize - 1;
+                    } else {
+                        ip += 2;
+                    }
+                }
+                Opcode::Jump => {
+                    let jump_offset = read_u16(&self.instructions.0[ip + 1..]);
+                    ip = jump_offset as usize - 1;
+                }
             }
             ip += 1;
         }
@@ -185,6 +201,15 @@ mod tests {
         }
     }
 
+    impl From<(&str, Value)> for VMTestCase {
+        fn from(t: (&str, Value)) -> Self {
+            Self {
+                input: t.0.to_string(),
+                expected: t.1,
+            }
+        }
+    }
+
     fn run_vm_tests(tests: &[VMTestCase]) {
         for VMTestCase { input, expected } in tests {
             let program = crate::test_utils::parse_program(&input);
@@ -253,8 +278,29 @@ mod tests {
             ("!!true", true),
             ("!!false", false),
             ("!!5", true),
+            ("!(if (false) { 10; })", true),
             // ("true && true", true),
             // ("true && false", false),
+        ]
+        .into_iter()
+        .map(VMTestCase::from)
+        .collect::<Vec<_>>();
+        run_vm_tests(&tests);
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let tests = [
+            ("if (true) { 10 }", 10.into()),
+            ("if (true) { 10 } else { 20 }", 10.into()),
+            ("if (false) { 10 } else { 20 }", 20.into()),
+            ("if (1) { 10 }", 10.into()),
+            ("if (1 < 2) { 10 }", 10.into()),
+            ("if (1 < 2) { 10 } else { 20 }", 10.into()),
+            ("if (1 > 2) { 10 } else { 20 }", 20.into()),
+            ("if (1 > 2) { 10 }", Value::Null),
+            ("if (false) { 10 }", Value::Null),
+            ("if ((if (false) { 10 })) { 10 } else { 20 }", 20.into()),
         ]
         .into_iter()
         .map(VMTestCase::from)

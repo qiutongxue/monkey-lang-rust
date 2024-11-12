@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
-    ast::{ExpressionEnum, Program, StatementEnum},
+    ast::{BlockStatement, ExpressionEnum, Program, StatementEnum},
     code::{make, Instructions, Opcode},
     object::Object,
 };
@@ -25,6 +25,8 @@ impl Display for CompileError {
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
+    last_instruction: Option<EmittedInstruction>,
+    previous_instruction: Option<EmittedInstruction>,
 }
 
 impl Compiler {
@@ -32,6 +34,8 @@ impl Compiler {
         Self {
             instructions: Instructions(vec![]),
             constants: vec![],
+            last_instruction: None,
+            previous_instruction: None,
         }
     }
 
@@ -50,16 +54,25 @@ impl Compiler {
         self.constants.len() as i32 - 1
     }
 
-    fn emit(&mut self, op: Opcode, operands: &[i32]) -> i32 {
+    fn emit(&mut self, op: Opcode, operands: &[i32]) -> usize {
         let ins = make(op, operands);
         let pos = self.add_instruction(ins);
+
+        self.set_last_instruction(op, pos);
         pos
     }
 
-    fn add_instruction(&mut self, ins: Vec<u8>) -> i32 {
+    fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
+        let previous = self.last_instruction.take();
+        let last = EmittedInstruction { opcode: op, pos };
+        self.previous_instruction = previous;
+        self.last_instruction = Some(last);
+    }
+
+    fn add_instruction(&mut self, ins: Vec<u8>) -> usize {
         let pos_new_instruction = self.instructions.0.len();
         self.instructions.0.extend(ins);
-        pos_new_instruction as _
+        pos_new_instruction
     }
 
     fn complie_stmt(&mut self, stmt: &StatementEnum) -> Result<(), CompileError> {
@@ -141,9 +154,59 @@ impl Compiler {
                 }
                 Ok(())
             }
+            ExpressionEnum::IfExpression(ie) => {
+                self.compile_expr(&ie.condition)?;
+                let jump_not_truthy_pos = self.emit(Opcode::JumpNotTruthy, &[9999]);
+                self.compile_block_stmt(&ie.consequence)?;
+                if self.last_instruction_is(Opcode::Pop) {
+                    self.remove_last_pop();
+                }
+                // 这是 consequence 里的 jump，要跳过 alternative
+                let jump_pos = self.emit(Opcode::Jump, &[9999]);
+                // 这里是 alternative/Null 的起始位置，即 jump_not_truthy 要跳到的地方
+                let after_consequence_pos = self.instructions.0.len();
+                self.change_operand(jump_not_truthy_pos, after_consequence_pos as i32);
+
+                if let Some(alternative) = &ie.alternative {
+                    self.compile_block_stmt(alternative)?;
+                    if self.last_instruction_is(Opcode::Pop) {
+                        self.remove_last_pop();
+                    }
+                } else {
+                    self.emit(Opcode::Null, &[]);
+                }
+                // 最后 jump 要跳到 alternative 结束的位置
+                let after_alternative_pos = self.instructions.0.len();
+                self.change_operand(jump_pos, after_alternative_pos as i32);
+
+                Ok(())
+            }
             ExpressionEnum::Identifier(_) => todo!(),
             _ => unreachable!(),
         }
+    }
+
+    fn compile_block_stmt(&mut self, block_stmt: &BlockStatement) -> Result<(), CompileError> {
+        for stmt in &block_stmt.statements {
+            self.complie_stmt(stmt)?;
+        }
+        Ok(())
+    }
+
+    fn last_instruction_is(&self, op: Opcode) -> bool {
+        self.last_instruction.as_ref().map(|i| i.opcode) == Some(op)
+    }
+
+    fn remove_last_pop(&mut self) {
+        let last_instruction = self.last_instruction.take().unwrap();
+        self.instructions.0.truncate(last_instruction.pos);
+        self.last_instruction = self.previous_instruction;
+    }
+
+    fn change_operand(&mut self, pos: usize, operand: i32) {
+        let opcode = self.instructions.0[pos];
+        let new_ins = make(opcode.try_into().unwrap(), &[operand]);
+        self.instructions.0[pos..pos + new_ins.len()].copy_from_slice(&new_ins);
     }
 
     pub fn byte_code(self) -> Bytecode {
@@ -158,6 +221,12 @@ impl Default for Compiler {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EmittedInstruction {
+    opcode: Opcode,
+    pos: usize,
 }
 
 #[derive(Debug)]
@@ -210,12 +279,13 @@ mod tests {
     }
 
     fn test_instructions(expected: &[Instructions], actual: &Instructions) {
-        let expected = expected
-            .iter()
+        let expected: Instructions = expected
+            .into_iter()
             .flat_map(|s| &s.0)
             .copied()
-            .collect::<Vec<_>>();
-        assert_eq!(expected, actual.0);
+            .collect::<Vec<_>>()
+            .into();
+        assert_eq!(expected.to_string(), actual.to_string());
     }
 
     fn test_constants(expected: &[Value], actual: &Vec<Object>) {
@@ -406,6 +476,44 @@ mod tests {
                     make(Opcode::True, &[]),
                     make(Opcode::Bang, &[]),
                     make(Opcode::Pop, &[]),
+                ],
+            ),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect();
+        run_compiler_test(&tests);
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let tests: Vec<CompilerTestCase> = vec![
+            (
+                "if (true) { 10 }; 3333;",
+                vec![10.into(), 3333.into()],
+                vec![
+                    make(Opcode::True, &[]),            // 0000
+                    make(Opcode::JumpNotTruthy, &[10]), // 0001
+                    make(Opcode::Constant, &[0]),       // 0004
+                    make(Opcode::Jump, &[11]),          // 0007
+                    make(Opcode::Null, &[]),            // 0010 alternative 用 null 替换
+                    make(Opcode::Pop, &[]),             // 0011 表达式有返回值，语句结束之后要清空
+                    make(Opcode::Constant, &[1]),       // 0012
+                    make(Opcode::Pop, &[]),             // 0015
+                ],
+            ),
+            (
+                "if (true) { 10 } else { 20 }; 3333;",
+                vec![10.into(), 20.into(), 3333.into()],
+                vec![
+                    make(Opcode::True, &[]),            // 0000
+                    make(Opcode::JumpNotTruthy, &[10]), // 0001
+                    make(Opcode::Constant, &[0]),       // 0004
+                    make(Opcode::Jump, &[13]),          // 0007
+                    make(Opcode::Constant, &[1]),       // 0010
+                    make(Opcode::Pop, &[]), // 0013 if else 整体是一个表达式，只需要在最后 pop 一次
+                    make(Opcode::Constant, &[2]), // 0014
+                    make(Opcode::Pop, &[]), // 0017
                 ],
             ),
         ]
