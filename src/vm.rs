@@ -6,7 +6,8 @@ use crate::{
     object::{Object, FALSE, NULL, TRUE},
 };
 
-const STACK_SIZE: usize = 2048;
+const STACK_SIZE: usize = 1 << 11;
+const GLOBAL_SIZE: usize = 1 << 16;
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -22,6 +23,7 @@ pub struct VM {
     instructions: Instructions,
     stack: Vec<Option<Object>>,
     sp: usize,
+    globals: Vec<Object>,
 }
 
 impl VM {
@@ -80,6 +82,18 @@ impl VM {
                 Opcode::Jump => {
                     let jump_offset = read_u16(&self.instructions.0[ip + 1..]);
                     ip = jump_offset as usize - 1;
+                }
+                Opcode::SetGlobal => {
+                    let global_index = read_u16(&self.instructions.0[ip + 1..]);
+                    ip += 2;
+                    let value = self.pop().unwrap();
+                    self.globals[global_index as usize] = value;
+                }
+                Opcode::GetGlobal => {
+                    let global_index = read_u16(&self.instructions.0[ip + 1..]);
+                    ip += 2;
+                    let value = self.globals[global_index as usize].clone();
+                    self.push(value)?;
                 }
             }
             ip += 1;
@@ -166,6 +180,7 @@ pub fn new(bytecode: Bytecode) -> VM {
         instructions: bytecode.instructions,
         stack: vec![None; STACK_SIZE],
         sp: 0,
+        globals: vec![Object::Null; GLOBAL_SIZE],
     }
 }
 
@@ -305,6 +320,20 @@ mod tests {
         .into_iter()
         .map(VMTestCase::from)
         .collect::<Vec<_>>();
+        run_vm_tests(&tests);
+    }
+
+    #[test]
+    fn test_global_let_statements() {
+        let tests = [
+            ("let one = 1; one", 1),
+            ("let one = 1; let two = 2; one + two", 3),
+            ("let one = 1; let two = one + one; one + two", 3),
+        ]
+        .into_iter()
+        .map(VMTestCase::from)
+        .collect::<Vec<_>>();
+
         run_vm_tests(&tests);
     }
 }

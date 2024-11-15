@@ -6,10 +6,13 @@ use crate::{
     object::Object,
 };
 
+use super::symbol_table::SymbolTable;
+
 #[derive(Debug)]
 pub enum CompileError {
     UnexpectedError,
     UnknownOperator(String),
+    IdentifierNotDefined(String),
 }
 
 impl Display for CompileError {
@@ -17,6 +20,7 @@ impl Display for CompileError {
         match self {
             CompileError::UnexpectedError => write!(f, "unexpected error"),
             CompileError::UnknownOperator(op) => write!(f, "unknown operator: {}", op),
+            CompileError::IdentifierNotDefined(id) => write!(f, "identifier not defined: {}", id),
         }
     }
 }
@@ -27,6 +31,7 @@ pub struct Compiler {
     constants: Vec<Object>,
     last_instruction: Option<EmittedInstruction>,
     previous_instruction: Option<EmittedInstruction>,
+    symbol_table: SymbolTable,
 }
 
 impl Compiler {
@@ -36,6 +41,7 @@ impl Compiler {
             constants: vec![],
             last_instruction: None,
             previous_instruction: None,
+            symbol_table: SymbolTable::new(),
         }
     }
 
@@ -77,7 +83,19 @@ impl Compiler {
 
     fn complie_stmt(&mut self, stmt: &StatementEnum) -> Result<(), CompileError> {
         match stmt {
-            StatementEnum::LetStatement(_) => todo!(),
+            StatementEnum::LetStatement(let_stmt) => {
+                match let_stmt.value.as_ref() {
+                    Some(expr) => {
+                        self.compile_expr(expr)?;
+                        let index = self.symbol_table.define(&let_stmt.name.value).index;
+                        self.emit(Opcode::SetGlobal, &[index]);
+                    }
+                    None => {
+                        self.emit(Opcode::Null, &[]);
+                    }
+                }
+                Ok(())
+            }
             StatementEnum::ReturnStatement(_) => todo!(),
             StatementEnum::ExpressionStatement(expr_stmt) => {
                 self.compile_expr(&expr_stmt.expression)?;
@@ -181,7 +199,11 @@ impl Compiler {
 
                 Ok(())
             }
-            ExpressionEnum::Identifier(_) => todo!(),
+            ExpressionEnum::Identifier(ident) => {
+                let symbol = self.symbol_table.resolve(&ident.value)?;
+                self.emit(Opcode::GetGlobal, &[symbol.index]);
+                Ok(())
+            }
             _ => unreachable!(),
         }
     }
@@ -520,6 +542,49 @@ mod tests {
         .into_iter()
         .map(|t| t.into())
         .collect();
+        run_compiler_test(&tests);
+    }
+
+    #[test]
+    fn test_global_let_statement() {
+        let tests: Vec<CompilerTestCase> = vec![
+            (
+                "let one = 1; let two = 2;",
+                vec![1.into(), 2.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::SetGlobal, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::SetGlobal, &[1]),
+                ],
+            ),
+            (
+                "let one = 1; one;",
+                vec![1.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::SetGlobal, &[0]),
+                    make(Opcode::GetGlobal, &[0]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "let one = 1; let two = one; two;",
+                vec![1.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::SetGlobal, &[0]),
+                    make(Opcode::GetGlobal, &[0]),
+                    make(Opcode::SetGlobal, &[1]),
+                    make(Opcode::GetGlobal, &[1]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect();
+
         run_compiler_test(&tests);
     }
 }

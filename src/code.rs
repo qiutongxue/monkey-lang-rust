@@ -100,6 +100,8 @@ define_opcode! {
     JumpNotTruthy = 13, "JumpNotTruthy", vec![2],
     Jump = 14, "Jump", vec![2],
     Null = 15, "Null", vec![],
+    SetGlobal = 16, "SetGlobal", vec![2],
+    GetGlobal = 17, "GetGlobal", vec![2],
 }
 
 #[derive(Debug)]
