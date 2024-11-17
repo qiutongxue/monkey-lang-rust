@@ -1,4 +1,4 @@
 mod builtin;
-mod eval;
+mod core;
 
-pub use eval::eval;
+pub use core::eval;
