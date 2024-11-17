@@ -109,6 +109,9 @@ impl VM {
             (Object::Integer(a), Object::Integer(b)) => {
                 self.execute_binary_integer_operation(op, a, b)
             }
+            (Object::String(a), Object::String(b)) => {
+                self.execute_binary_string_operation(op, a, b)
+            }
             _ => Err(RuntimeError::MismachedTypes),
         }
     }
@@ -150,6 +153,18 @@ impl VM {
         };
         self.push(result.into())?;
         Ok(())
+    }
+
+    fn execute_binary_string_operation(
+        &mut self,
+        op: Opcode,
+        left: String,
+        right: String,
+    ) -> Result<(), RuntimeError> {
+        match op {
+            Opcode::Add => self.push(Object::from(left + &right)),
+            _ => Err(RuntimeError::InvalidOperation),
+        }
     }
 
     pub fn push(&mut self, obj: Object) -> Result<(), RuntimeError> {
@@ -329,6 +344,20 @@ mod tests {
             ("let one = 1; one", 1),
             ("let one = 1; let two = 2; one + two", 3),
             ("let one = 1; let two = one + one; one + two", 3),
+        ]
+        .into_iter()
+        .map(VMTestCase::from)
+        .collect::<Vec<_>>();
+
+        run_vm_tests(&tests);
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        let tests = [
+            ("\"monkey\"", Value::from("monkey")),
+            ("\"mon\" + \"key\"", "monkey".into()),
+            ("\"mon\" + \"key\" + \"banana\"", "monkeybanana".into()),
         ]
         .into_iter()
         .map(VMTestCase::from)

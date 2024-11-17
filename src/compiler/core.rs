@@ -204,6 +204,12 @@ impl Compiler {
                 self.emit(Opcode::GetGlobal, &[symbol.index]);
                 Ok(())
             }
+            ExpressionEnum::StringLiteral(s) => {
+                let value = Object::from(s.value.to_owned());
+                let index = self.add_constant(value);
+                self.emit(Opcode::Constant, &[index]);
+                Ok(())
+            }
             _ => unreachable!(),
         }
     }
@@ -585,6 +591,31 @@ mod tests {
         .map(|t| t.into())
         .collect();
 
+        run_compiler_test(&tests);
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        let tests: Vec<CompilerTestCase> = vec![
+            (
+                r#""monkey""#,
+                vec!["monkey".into()],
+                vec![make(Opcode::Constant, &[0]), make(Opcode::Pop, &[])],
+            ),
+            (
+                r#""mon" + "key""#,
+                vec!["mon".into(), "key".into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Add, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect();
         run_compiler_test(&tests);
     }
 }
