@@ -53,7 +53,7 @@ impl Object {
     pub fn inspect(&self) -> String {
         match self {
             Object::Integer(v) => v.to_string(),
-            Object::String(s) => s.to_owned(),
+            Object::String(s) => format!("\"{}\"", s.to_owned()),
             Object::Boolean(v) => v.to_string(),
             Object::Null => "null".to_string(),
             Object::ReturnValue(v) => v.inspect(),
