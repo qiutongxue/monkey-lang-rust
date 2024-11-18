@@ -187,15 +187,20 @@ impl VM {
     pub fn last_popped_elem(&self) -> Option<&Object> {
         self.stack[self.sp].as_ref()
     }
-}
 
-pub fn new(bytecode: Bytecode) -> VM {
-    VM {
-        constants: bytecode.constants,
-        instructions: bytecode.instructions,
-        stack: vec![None; STACK_SIZE],
-        sp: 0,
-        globals: vec![Object::Null; GLOBAL_SIZE],
+    pub fn read_bytecode(&mut self, bytecode: Bytecode) {
+        self.constants = bytecode.constants;
+        self.instructions = bytecode.instructions;
+    }
+
+    pub fn new() -> Self {
+        VM {
+            constants: vec![],
+            instructions: Instructions(vec![]),
+            stack: vec![None; STACK_SIZE],
+            sp: 0,
+            globals: vec![Object::Null; GLOBAL_SIZE],
+        }
     }
 }
 
@@ -206,7 +211,7 @@ mod tests {
         test_utils::{object::test_object, Value},
     };
 
-    use super::new;
+    use super::VM;
 
     struct VMTestCase {
         input: String,
@@ -246,7 +251,8 @@ mod tests {
 
             let mut comp = Compiler::new();
             comp.compile(&program).expect("compile error");
-            let mut vm = new(comp.byte_code());
+            let mut vm = VM::new();
+            vm.read_bytecode(comp.byte_code());
             vm.run().expect("run error");
 
             let stack_elem = vm.last_popped_elem().expect("empty stack");

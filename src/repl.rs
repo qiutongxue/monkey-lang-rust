@@ -22,7 +22,7 @@ use crate::{
     evaluator, lexer,
     object::Environment,
     parser::{self, ParseError},
-    vm,
+    vm::VM,
 };
 
 pub enum Engine {
@@ -53,17 +53,23 @@ fn start_eval(stdin: std::io::Stdin, mut out: std::io::Stdout) {
 }
 
 fn start_vm(stdin: std::io::Stdin, mut out: std::io::Stdout) {
+    let mut comp = Compiler::new();
+    let mut vm = VM::new();
     loop {
         match read_and_parse(&stdin, &mut out) {
             Ok(program) => {
-                // FIXME: 全局变量/环境需要绑定
-                let mut comp = Compiler::new();
-                comp.compile(&program).expect("Failed to compile program");
-                let mut vm = vm::new(comp.byte_code());
-                vm.run().expect("execute bytecode failed");
-
+                if let Err(e) = comp.compile(&program) {
+                    eprintln!("Error: {}", e);
+                    continue;
+                }
+                let bytecode = comp.byte_code();
+                vm.read_bytecode(bytecode);
+                if let Err(e) = vm.run() {
+                    eprintln!("Error: {:?}", e);
+                    continue;
+                }
                 let stack_top = vm.last_popped_elem().unwrap();
-                println!("{}", stack_top.inspect())
+                println!("{}", stack_top.inspect());
             }
             Err(error) => eprintln!("{}", error),
         }

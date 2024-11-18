@@ -230,11 +230,13 @@ impl Compiler {
         self.instructions.0[pos..pos + new_ins.len()].copy_from_slice(&new_ins);
     }
 
-    pub fn byte_code(self) -> Bytecode {
-        Bytecode {
-            instructions: self.instructions,
-            constants: self.constants,
-        }
+    pub fn byte_code(&mut self) -> Bytecode {
+        let bytecode = Bytecode {
+            instructions: self.instructions.clone(),
+            constants: self.constants.clone(),
+        };
+        self.instructions.0.clear();
+        bytecode
     }
 }
 
