@@ -113,7 +113,6 @@ impl Compiler {
                 // 存 integer 在常量池的地址，而不是值
                 let index = self.add_constant(integer);
                 self.emit(Opcode::Constant, &[index]);
-                Ok(())
             }
             ExpressionEnum::PrefixExpression(expr) => {
                 self.compile_expr(&expr.right)?;
@@ -126,7 +125,6 @@ impl Compiler {
                     }
                     _ => return Err(CompileError::UnknownOperator(expr.operator.clone())),
                 }
-                Ok(())
             }
             ExpressionEnum::InfixExpression(expr) => {
                 // 翻转
@@ -162,7 +160,6 @@ impl Compiler {
                     }
                     _ => return Err(CompileError::UnknownOperator(expr.operator.clone())),
                 }
-                Ok(())
             }
             ExpressionEnum::Boolean(b) => {
                 if b.value {
@@ -170,7 +167,6 @@ impl Compiler {
                 } else {
                     self.emit(Opcode::False, &[]);
                 }
-                Ok(())
             }
             ExpressionEnum::IfExpression(ie) => {
                 self.compile_expr(&ie.condition)?;
@@ -196,22 +192,19 @@ impl Compiler {
                 // 最后 jump 要跳到 alternative 结束的位置
                 let after_alternative_pos = self.instructions.0.len();
                 self.change_operand(jump_pos, after_alternative_pos as i32);
-
-                Ok(())
             }
             ExpressionEnum::Identifier(ident) => {
                 let symbol = self.symbol_table.resolve(&ident.value)?;
                 self.emit(Opcode::GetGlobal, &[symbol.index]);
-                Ok(())
             }
             ExpressionEnum::StringLiteral(s) => {
                 let value = Object::from(s.value.to_owned());
                 let index = self.add_constant(value);
                 self.emit(Opcode::Constant, &[index]);
-                Ok(())
             }
             _ => unreachable!(),
         }
+        Ok(())
     }
 
     fn compile_block_stmt(&mut self, block_stmt: &BlockStatement) -> Result<(), CompileError> {
