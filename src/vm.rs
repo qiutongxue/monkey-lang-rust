@@ -95,6 +95,16 @@ impl VM {
                     let value = self.globals[global_index as usize].clone();
                     self.push(value)?;
                 }
+                Opcode::Array => {
+                    let elements_count = read_u16(&self.instructions.0[ip + 1..]) as usize;
+                    ip += 2;
+                    // 前面的 elements_count 个元素就是数组元素
+                    let mut array = vec![NULL; elements_count];
+                    for i in 0..elements_count {
+                        array[elements_count - 1 - i] = self.pop().unwrap();
+                    }
+                    self.push(Object::Array(array))?;
+                }
             }
             ip += 1;
         }
@@ -364,6 +374,26 @@ mod tests {
             ("\"monkey\"", Value::from("monkey")),
             ("\"mon\" + \"key\"", "monkey".into()),
             ("\"mon\" + \"key\" + \"banana\"", "monkeybanana".into()),
+        ]
+        .into_iter()
+        .map(VMTestCase::from)
+        .collect::<Vec<_>>();
+
+        run_vm_tests(&tests);
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let tests = [
+            ("[]", Value::Array(vec![])),
+            (
+                "[1, 2, 3]",
+                Value::Array(vec![1.into(), 2.into(), 3.into()]),
+            ),
+            (
+                "[1 + 2, 3 * 4, 5 + 6]",
+                Value::Array(vec![3.into(), 12.into(), 11.into()]),
+            ),
         ]
         .into_iter()
         .map(VMTestCase::from)

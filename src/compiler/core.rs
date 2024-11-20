@@ -202,6 +202,12 @@ impl Compiler {
                 let index = self.add_constant(value);
                 self.emit(Opcode::Constant, &[index]);
             }
+            ExpressionEnum::ArrayLiteral(al) => {
+                for el in &al.elements {
+                    self.compile_expr(el)?;
+                }
+                self.emit(Opcode::Array, &[al.elements.len() as i32]);
+            }
             _ => unreachable!(),
         }
         Ok(())
@@ -604,6 +610,49 @@ mod tests {
                     make(Opcode::Constant, &[0]),
                     make(Opcode::Constant, &[1]),
                     make(Opcode::Add, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect();
+        run_compiler_test(&tests);
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let tests: Vec<CompilerTestCase> = vec![
+            (
+                "[]",
+                vec![], // array object
+                vec![make(Opcode::Array, &[0]), make(Opcode::Pop, &[])],
+            ),
+            (
+                "[1, 2, 3]",
+                vec![1.into(), 2.into(), 3.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Constant, &[2]),
+                    make(Opcode::Array, &[3]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "[1 + 2, 3 * 4, 5 - 6]",
+                vec![1.into(), 2.into(), 3.into(), 4.into(), 5.into(), 6.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Add, &[]),
+                    make(Opcode::Constant, &[2]),
+                    make(Opcode::Constant, &[3]),
+                    make(Opcode::Mul, &[]),
+                    make(Opcode::Constant, &[4]),
+                    make(Opcode::Constant, &[5]),
+                    make(Opcode::Sub, &[]),
+                    make(Opcode::Array, &[3]),
                     make(Opcode::Pop, &[]),
                 ],
             ),
