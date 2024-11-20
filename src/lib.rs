@@ -57,6 +57,9 @@ macro_rules! impl_node_for_enum {
 
 #[cfg(test)]
 mod test_utils {
+    use std::collections::HashMap;
+
+    use crate::object::Object;
 
     #[derive(Debug)]
     pub enum Value {
@@ -65,6 +68,7 @@ mod test_utils {
         Null,
         String(String),
         Array(Vec<Value>),
+        Dict(HashMap<Object, Value>),
     }
 
     impl From<i64> for Value {
@@ -92,6 +96,8 @@ mod test_utils {
     }
 
     pub mod object {
+        use std::collections::HashMap;
+
         use crate::object::Object;
 
         use super::Value;
@@ -137,6 +143,22 @@ mod test_utils {
             }
         }
 
+        fn test_dict_object(obj: &Object, expected: &HashMap<Object, Value>) {
+            if let Object::Dict(dict) = obj {
+                assert_eq!(dict.len(), expected.len());
+                for (key, expected_value) in expected {
+                    let dict_value = dict.get(&key);
+                    if let Some(dict_value) = dict_value {
+                        test_object(dict_value, expected_value);
+                    } else {
+                        panic!("key not found in dictionary, key={:?}", key);
+                    }
+                }
+            } else {
+                panic!("object is not Dictionary, got={:?}", obj);
+            }
+        }
+
         pub fn test_null_object(obj: &Object) {
             assert!(matches!(obj, Object::Null), "object is not Null")
         }
@@ -157,6 +179,7 @@ mod test_utils {
                 Value::Null => test_null_object(obj),
                 Value::Array(arr) => test_array_object(obj, arr),
                 Value::Boolean(b) => test_boolean_object(obj, *b),
+                Value::Dict(dict) => test_dict_object(obj, dict),
             }
         }
     }
