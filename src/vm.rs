@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 use crate::{
     code::{read_u16, Instructions, Opcode},
@@ -104,6 +104,17 @@ impl VM {
                         array[elements_count - 1 - i] = self.pop().unwrap();
                     }
                     self.push(Object::Array(array))?;
+                }
+                Opcode::Dictionary => {
+                    let elements_count = read_u16(&self.instructions.0[ip + 1..]) as usize;
+                    ip += 2;
+                    let mut dict = HashMap::new();
+                    for _ in 0..elements_count / 2 {
+                        let value = self.pop().unwrap();
+                        let key = self.pop().unwrap();
+                        dict.insert(key, value);
+                    }
+                    self.push(Object::Dict(dict))?;
                 }
             }
             ip += 1;
@@ -216,6 +227,8 @@ impl VM {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::{
         compiler::Compiler,
         test_utils::{object::test_object, Value},
@@ -399,6 +412,25 @@ mod tests {
         .map(VMTestCase::from)
         .collect::<Vec<_>>();
 
+        run_vm_tests(&tests);
+    }
+
+    #[test]
+    fn test_dict_literals() {
+        let tests = [
+            ("{}", Value::Dict(HashMap::new())),
+            (
+                "{1: 2, 2: 3}",
+                Value::Dict(HashMap::from([(1.into(), 2.into()), (2.into(), 3.into())])),
+            ),
+            (
+                "{1 + 1: 2 * 2, 3 + 3: 4 * 4}",
+                Value::Dict(HashMap::from([(2.into(), 4.into()), (6.into(), 16.into())])),
+            ),
+        ]
+        .into_iter()
+        .map(VMTestCase::from)
+        .collect::<Vec<_>>();
         run_vm_tests(&tests);
     }
 }

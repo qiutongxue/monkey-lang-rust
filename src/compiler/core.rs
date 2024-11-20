@@ -208,6 +208,16 @@ impl Compiler {
                 }
                 self.emit(Opcode::Array, &[al.elements.len() as i32]);
             }
+            ExpressionEnum::DictLiteral(dl) => {
+                let mut kv = dl.pairs.iter().collect::<Vec<_>>();
+                // 排序只是为了通过测试（因为 HashMap 是无序的），结果是一样的
+                kv.sort_by_key(|(k, _)| k.to_string());
+                for (key, value) in kv {
+                    self.compile_expr(key)?;
+                    self.compile_expr(value)?;
+                }
+                self.emit(Opcode::Dictionary, &[dl.pairs.len() as i32 * 2]);
+            }
             _ => unreachable!(),
         }
         Ok(())
@@ -653,6 +663,51 @@ mod tests {
                     make(Opcode::Constant, &[5]),
                     make(Opcode::Sub, &[]),
                     make(Opcode::Array, &[3]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect();
+        run_compiler_test(&tests);
+    }
+
+    #[test]
+    fn test_dict_literals() {
+        let tests: Vec<CompilerTestCase> = vec![
+            (
+                "{}",
+                vec![], // dict object
+                vec![make(Opcode::Dictionary, &[0]), make(Opcode::Pop, &[])],
+            ),
+            (
+                "{1: 2, 3: 4, 5: 6}",
+                vec![1.into(), 2.into(), 3.into(), 4.into(), 5.into(), 6.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Constant, &[2]),
+                    make(Opcode::Constant, &[3]),
+                    make(Opcode::Constant, &[4]),
+                    make(Opcode::Constant, &[5]),
+                    make(Opcode::Dictionary, &[6]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "{1: 2 + 3, 4: 5 * 6}",
+                vec![1.into(), 2.into(), 3.into(), 4.into(), 5.into(), 6.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Constant, &[2]),
+                    make(Opcode::Add, &[]),
+                    make(Opcode::Constant, &[3]),
+                    make(Opcode::Constant, &[4]),
+                    make(Opcode::Constant, &[5]),
+                    make(Opcode::Mul, &[]),
+                    make(Opcode::Dictionary, &[4]),
                     make(Opcode::Pop, &[]),
                 ],
             ),

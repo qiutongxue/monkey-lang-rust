@@ -103,6 +103,7 @@ define_opcode! {
     SetGlobal = 16, "SetGlobal", vec![2],
     GetGlobal = 17, "GetGlobal", vec![2],
     Array = 18, "Array", vec![2],
+    Dictionary = 19, "Dictionary", vec![2],
 }
 
 #[derive(Debug)]
