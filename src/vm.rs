@@ -47,7 +47,7 @@ impl VM {
                     self.execute_binary_operation(op)?
                 }
                 Opcode::Pop => {
-                    self.pop();
+                    self.pop_cloned();
                 }
                 Opcode::True => {
                     self.push(TRUE)?;
@@ -197,12 +197,20 @@ impl VM {
         Ok(())
     }
 
-    pub fn pop(&mut self) -> Option<Object> {
+    pub fn pop_cloned(&mut self) -> Option<Object> {
         if self.sp == 0 {
             return None;
         }
         self.sp -= 1;
         self.stack[self.sp].clone()
+    }
+
+    pub fn pop(&mut self) -> Option<Object> {
+        if self.sp == 0 {
+            return None;
+        }
+        self.sp -= 1;
+        self.stack[self.sp].take()
     }
 
     pub fn last_popped_elem(&self) -> Option<&Object> {
