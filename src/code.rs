@@ -106,6 +106,23 @@ define_opcode! {
     Dictionary = 19, "Dictionary", vec![2],
 }
 
+impl std::fmt::Display for Opcode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Add => write!(f, "+"),
+            Self::Sub => write!(f, "-"),
+            Self::Mul => write!(f, "*"),
+            Self::Div => write!(f, "/"),
+            Self::Equal => write!(f, "=="),
+            Self::NotEqual => write!(f, "!="),
+            Self::GreaterThan => write!(f, ">"),
+            Self::Minus => write!(f, "-"),
+            Self::Bang => write!(f, "!"),
+            _ => write!(f, "{:?}", self), // 默认情况下，使用调试格式输出枚举值
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum OpcodeError {
     InvalidOpcode(u8),

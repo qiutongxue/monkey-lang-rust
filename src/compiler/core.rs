@@ -20,7 +20,7 @@ impl Display for CompileError {
         match self {
             CompileError::UnexpectedError => write!(f, "unexpected error"),
             CompileError::UnknownOperator(op) => write!(f, "unknown operator: {}", op),
-            CompileError::IdentifierNotDefined(id) => write!(f, "identifier not defined: {}", id),
+            CompileError::IdentifierNotDefined(id) => write!(f, "identifier not found: {}", id),
         }
     }
 }

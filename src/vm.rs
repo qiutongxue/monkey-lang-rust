@@ -12,9 +12,20 @@ const GLOBAL_SIZE: usize = 1 << 16;
 #[derive(Debug)]
 pub enum RuntimeError {
     StackOverflow,
-    MismachedTypes,
-    InvalidOperation,
+    MismachedTypes(String),
+    InvalidOperation(String),
     InnerError(Box<dyn Error>),
+}
+
+impl std::fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RuntimeError::StackOverflow => write!(f, "Stack overflow"),
+            RuntimeError::MismachedTypes(msg) => write!(f, "type mismatch: {msg}"),
+            RuntimeError::InvalidOperation(msg) => write!(f, "unknown operator: {msg}"),
+            RuntimeError::InnerError(e) => write!(f, "Inner error: {}", e),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -68,7 +79,12 @@ impl VM {
                 }
                 Opcode::Minus => match self.pop().unwrap() {
                     Object::Integer(n) => self.push(Object::from(-n))?,
-                    _ => return Err(RuntimeError::InvalidOperation),
+                    obj => {
+                        return Err(RuntimeError::InvalidOperation(format!(
+                            "-{}",
+                            obj.get_type()
+                        )))
+                    }
                 },
                 Opcode::JumpNotTruthy => {
                     let is_truthy = self.pop().map_or(false, |obj| obj.is_truthy());
@@ -133,7 +149,18 @@ impl VM {
             (Object::String(a), Object::String(b)) => {
                 self.execute_binary_string_operation(op, a, b)
             }
-            _ => Err(RuntimeError::MismachedTypes),
+            (a, b) if a.get_type() != b.get_type() => Err(RuntimeError::MismachedTypes(format!(
+                "{} {} {}",
+                a.get_type(),
+                op,
+                b.get_type()
+            ))),
+            (a, b) => Err(RuntimeError::InvalidOperation(format!(
+                "{} {} {}",
+                a.get_type(),
+                op,
+                b.get_type()
+            ))),
         }
     }
 
@@ -146,16 +173,33 @@ impl VM {
                     Opcode::Equal => left == right,
                     Opcode::NotEqual => left != right,
                     Opcode::GreaterThan => left > right,
-                    _ => return Err(RuntimeError::InvalidOperation),
+                    _ => {
+                        return Err(RuntimeError::InvalidOperation(format!(
+                            "INTEGER {op} INTEGER"
+                        )))
+                    }
                 };
                 self.push(Object::from(result))
             }
             (Object::Boolean(left), Object::Boolean(right)) => match op {
                 Opcode::Equal => self.push(Object::from(left == right)),
                 Opcode::NotEqual => self.push(Object::from(left != right)),
-                _ => Err(RuntimeError::InvalidOperation),
+                _ => Err(RuntimeError::InvalidOperation(format!(
+                    "BOOLEAN {op} BOOLEAN",
+                ))),
             },
-            _ => Err(RuntimeError::MismachedTypes),
+            (a, b) if a.get_type() != b.get_type() => Err(RuntimeError::MismachedTypes(format!(
+                "{} {} {}",
+                a.get_type(),
+                op,
+                b.get_type()
+            ))),
+            (a, b) => Err(RuntimeError::InvalidOperation(format!(
+                "{} {} {}",
+                a.get_type(),
+                op,
+                b.get_type()
+            ))),
         }
     }
 
@@ -170,7 +214,7 @@ impl VM {
             Opcode::Sub => left - right,
             Opcode::Mul => left * right,
             Opcode::Div => left / right,
-            _ => return Err(RuntimeError::InvalidOperation),
+            _ => unreachable!(),
         };
         self.push(result.into())?;
         Ok(())
@@ -184,7 +228,9 @@ impl VM {
     ) -> Result<(), RuntimeError> {
         match op {
             Opcode::Add => self.push(Object::from(left + &right)),
-            _ => Err(RuntimeError::InvalidOperation),
+            _ => Err(RuntimeError::InvalidOperation(format!(
+                "STRING {op} STRING"
+            ))),
         }
     }
 
