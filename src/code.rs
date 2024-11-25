@@ -104,6 +104,7 @@ define_opcode! {
     GetGlobal = 17, "GetGlobal", vec![2],
     Array = 18, "Array", vec![2],
     Dictionary = 19, "Dictionary", vec![2],
+    Index = 20, "Index", vec![],
 }
 
 impl std::fmt::Display for Opcode {

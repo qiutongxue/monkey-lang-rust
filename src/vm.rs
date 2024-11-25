@@ -132,6 +132,27 @@ impl VM {
                     }
                     self.push(Object::Dict(dict))?;
                 }
+                Opcode::Index => {
+                    let index = self.pop().unwrap();
+                    let obj = self.pop().unwrap();
+                    match (&obj, &index) {
+                        (Object::Array(array), Object::Integer(index)) => {
+                            let value = array.get(*index as usize).cloned().unwrap_or(NULL);
+                            self.push(value)?;
+                        }
+                        (Object::Dict(dict), index) => {
+                            let value = dict.get(index).cloned().unwrap_or(NULL);
+                            self.push(value)?;
+                        }
+                        _ => {
+                            return Err(RuntimeError::InvalidOperation(format!(
+                                "{} cannot be indexed with {}",
+                                obj.get_type(),
+                                index.get_type()
+                            )))
+                        }
+                    }
+                }
             }
             ip += 1;
         }

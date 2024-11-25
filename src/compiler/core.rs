@@ -218,6 +218,11 @@ impl Compiler {
                 }
                 self.emit(Opcode::Dictionary, &[dl.pairs.len() as i32 * 2]);
             }
+            ExpressionEnum::IndexExpression(ie) => {
+                self.compile_expr(&ie.left)?;
+                self.compile_expr(&ie.index)?;
+                self.emit(Opcode::Index, &[]);
+            }
             _ => unreachable!(),
         }
         Ok(())
@@ -708,6 +713,62 @@ mod tests {
                     make(Opcode::Constant, &[5]),
                     make(Opcode::Mul, &[]),
                     make(Opcode::Dictionary, &[4]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect();
+        run_compiler_test(&tests);
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let tests: Vec<CompilerTestCase> = vec![
+            (
+                "[1, 2, 3][1 + 1]",
+                vec![1.into(), 2.into(), 3.into(), 1.into(), 1.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Constant, &[2]),
+                    make(Opcode::Array, &[3]),
+                    make(Opcode::Constant, &[3]),
+                    make(Opcode::Constant, &[4]),
+                    make(Opcode::Add, &[]),
+                    make(Opcode::Index, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "{1: 2}[2 - 1]",
+                vec![1.into(), 2.into(), 2.into(), 1.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Dictionary, &[2]),
+                    make(Opcode::Constant, &[2]),
+                    make(Opcode::Constant, &[3]),
+                    make(Opcode::Sub, &[]),
+                    make(Opcode::Index, &[]),
+                    make(Opcode::Pop, &[]),
+                ],
+            ),
+            (
+                "let arr = [1, 2, 3]; arr[1 + 1]",
+                vec![1.into(), 2.into(), 3.into(), 1.into(), 1.into()],
+                vec![
+                    make(Opcode::Constant, &[0]),
+                    make(Opcode::Constant, &[1]),
+                    make(Opcode::Constant, &[2]),
+                    make(Opcode::Array, &[3]),
+                    make(Opcode::SetGlobal, &[0]),
+                    make(Opcode::GetGlobal, &[0]),
+                    make(Opcode::Constant, &[3]),
+                    make(Opcode::Constant, &[4]),
+                    make(Opcode::Add, &[]),
+                    make(Opcode::Index, &[]),
                     make(Opcode::Pop, &[]),
                 ],
             ),
